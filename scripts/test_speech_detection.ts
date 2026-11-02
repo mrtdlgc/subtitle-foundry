@@ -77,7 +77,7 @@ async function getAudioDuration(inputFile: string) {
 }
 
 async function decodeToRawPCM(audioFile: string) {
-  const pcmPath = path.join(os.tmpdir(), `yesilcam-diagnostic-${randomUUID()}.pcm`);
+  const pcmPath = path.join(os.tmpdir(), `subtitle-foundry-diagnostic-${randomUUID()}.pcm`);
   try {
     await run(
       'ffmpeg',

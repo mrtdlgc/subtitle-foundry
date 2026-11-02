@@ -1,11 +1,11 @@
 :root {
   color-scheme: dark;
-  --bg: #111512;
-  --panel: #1a201b;
-  --line: #354035;
-  --ink: #f2eddf;
-  --muted: #a6afa3;
-  --gold: #e5bb72;
+  --bg: #15171b;
+  --panel: #20242b;
+  --line: #44413d;
+  --ink: #f5f0e9;
+  --muted: #b7aea4;
+  --copper: #e9a779;
   --danger: #efad8d;
   font-family: Arial, Helvetica, sans-serif;
   background: var(--bg);
@@ -28,9 +28,9 @@ a {
 }
 button,
 .button {
-  border: 1px solid var(--gold);
-  background: var(--gold);
-  color: #211b11;
+  border: 1px solid var(--copper);
+  background: var(--copper);
+  color: #292019;
   border-radius: 7px;
   padding: 10px 14px;
   font-weight: 600;
@@ -59,7 +59,7 @@ a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--copper);
   outline-offset: 3px;
 }
 input,
@@ -67,12 +67,12 @@ select,
 textarea {
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #101710;
+  background: #17191d;
   color: var(--ink);
   padding: 10px;
 }
 input[type='checkbox'] {
-  accent-color: var(--gold);
+  accent-color: var(--copper);
   width: 16px;
   height: 16px;
 }
@@ -99,7 +99,7 @@ textarea {
   text-decoration: none;
 }
 .brand span {
-  color: var(--gold);
+  color: var(--copper);
   font-weight: 400;
 }
 .room-label {
@@ -127,7 +127,7 @@ main {
 .eyebrow {
   font-size: 10px;
   letter-spacing: 0.2em;
-  color: var(--gold);
+  color: var(--copper);
   margin: 0 0 9px;
   font-weight: 700;
 }
@@ -324,7 +324,7 @@ kbd {
 }
 .badge {
   font-size: 11px;
-  color: var(--gold);
+  color: var(--copper);
   border: 1px solid #766142;
   border-radius: 20px;
   padding: 4px 8px;
@@ -354,7 +354,7 @@ kbd {
 }
 .cue-row.active {
   background: #28352a;
-  border-left: 3px solid var(--gold);
+  border-left: 3px solid var(--copper);
   padding-left: 14px;
 }
 .cue-row.selected {
@@ -444,7 +444,7 @@ kbd {
 }
 summary {
   cursor: pointer;
-  color: var(--gold);
+  color: var(--copper);
   font-size: 13px;
   margin-bottom: 12px;
 }
@@ -563,13 +563,13 @@ button.danger {
   top: 0;
   width: 2px;
   height: 100%;
-  background: var(--gold);
+  background: var(--copper);
 }
 .waveform-handle span {
   position: absolute;
   top: 2px;
   left: 8px;
-  background: var(--gold);
+  background: var(--copper);
   color: var(--bg);
   padding: 3px 4px;
   border-radius: 3px;
@@ -595,7 +595,7 @@ button.danger {
   min-width: 30px;
   width: 100%;
   padding: 0;
-  accent-color: var(--gold);
+  accent-color: var(--copper);
 }
 #saveStatus.error {
   color: var(--danger);
@@ -695,4 +695,13 @@ button.danger {
   .shortcuts {
     display: none;
   }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand img {
+  flex-shrink: 0;
 }

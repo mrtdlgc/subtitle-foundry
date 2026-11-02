@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 const repo = fileURLToPath(new URL('../../', import.meta.url));
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-hybrid-browser-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-hybrid-browser-'));
 process.env.DATA_DIR = root;
 const { run, childEnvironment } = await import(`${repo}/build/scripts/lib/process.js`);
 const source =
@@ -256,7 +256,9 @@ try {
   console.log(
     'PASS: embedded extraction, server translation, automatic local playback, local waveform and wrong-file protection',
   );
-  await editor.locator('#workspace').screenshot({ path: '/tmp/yesilcam-hybrid-editor-brave.png' });
+  await editor
+    .locator('#workspace')
+    .screenshot({ path: '/tmp/subtitle-foundry-hybrid-editor-brave.png' });
   const multi = path.join(root, 'multiple-audio.mkv');
   await run('ffmpeg', [
     '-v',
@@ -519,7 +521,7 @@ try {
           .catch(() => ''),
         errors,
       );
-      await page.screenshot({ path: '/tmp/yesilcam-hybrid-failure.png' }).catch(() => {});
+      await page.screenshot({ path: '/tmp/subtitle-foundry-hybrid-failure.png' }).catch(() => {});
     }
   console.error('Browser fixture failed:', error);
   console.error(logs.slice(-2000));

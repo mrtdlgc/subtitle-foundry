@@ -1,4 +1,4 @@
-export {};
+import { reviewStorageKey } from './storage-compat.js';
 
 interface Cue {
   id: string;
@@ -379,7 +379,7 @@ async function initialize() {
     ids.add(cue.id);
     previousStart = cue.start;
   }
-  storageKey = `yesilcam-review-v1:${id}:${session.subtitleSha256}`;
+  storageKey = reviewStorageKey(`review-v1:${id}:${session.subtitleSha256}`);
   saved = readSaved();
   const requestedPosition = parameters.has('time') ? Number(parameters.get('time')) : NaN;
   const resumePosition =
@@ -390,7 +390,7 @@ async function initialize() {
       : saved.position;
   $('filmTitle').textContent = session.title;
   $('filmDescription').textContent = session.description;
-  document.title = `${session.title} · Subtitle review`;
+  document.title = `${session.title} · Subtitle Foundry`;
   $('cueCount').textContent = `${session.cues.length} cues`;
   const download = $<HTMLAnchorElement>('downloadSrt');
   download.href = safeFile(session.srt, root);

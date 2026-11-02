@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-codex-test-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-codex-test-'));
 process.env.DATA_DIR = root;
 const {
   codexArgs,
@@ -388,7 +388,11 @@ test(
       assert.equal((await fetchLocal('/api/subtitle-translations')).status, 401);
       const login = await fetchLocal('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Yesilcam-Request': '1', Origin: origin },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Subtitle-Foundry-Request': '1',
+          Origin: origin,
+        },
         body: JSON.stringify({ password: 'test-only-password-123' }),
       });
       assert.equal(login.status, 200);
@@ -396,7 +400,7 @@ test(
       const headers = {
         Cookie: cookie,
         'Content-Type': 'application/json',
-        'X-Yesilcam-Request': '1',
+        'X-Subtitle-Foundry-Request': '1',
         Origin: origin,
       };
       const request = (url: string, body?: unknown) =>

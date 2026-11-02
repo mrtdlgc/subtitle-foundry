@@ -1,4 +1,5 @@
 import { startWaveform } from './review-waveform.js';
+import { reviewStorageKey } from './storage-compat.js';
 import { localWaveform, localScreening, matchLocalFile } from './local-media.js';
 import {
   recallLocalFile,
@@ -64,7 +65,7 @@ export async function startEditor(id: string) {
   const root = new URL('./', location.href);
   const api = new URL(`api/reviews/${id}`, root);
   const video = $<HTMLVideoElement>('film');
-  const draftKey = `yesilcam-corrections-v2:${root.pathname}:${id}`;
+  const draftKey = reviewStorageKey(`corrections-v2:${root.pathname}:${id}`);
   const pending = new Map<string, { edit: Edit; generation: number }>();
   const invalidTiming = new Map<string, { start: string; end: string }>();
   let generation = 0,
@@ -108,7 +109,7 @@ export async function startEditor(id: string) {
       credentials: 'same-origin',
       keepalive,
       headers: {
-        'X-Yesilcam-Request': '1',
+        'X-Subtitle-Foundry-Request': '1',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),

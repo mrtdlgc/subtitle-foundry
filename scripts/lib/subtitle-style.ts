@@ -215,7 +215,7 @@ function assText(text: string) {
 
 export function subtitlesToAss(cues: Segment[]) {
   const header = `[Script Info]
-Title: Yesilcam Revival - Netflix-inspired subtitles
+Title: Subtitle Foundry - Netflix-inspired subtitles
 ScriptType: v4.00+
 PlayResX: 1920
 PlayResY: 1080

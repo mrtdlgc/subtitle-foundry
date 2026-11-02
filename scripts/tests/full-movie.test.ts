@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-movie-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-movie-'));
 process.env.DATA_DIR = root;
 process.env.ELEVENLABS_API_KEY = 'test-only-fixture';
 after(() => fs.rm(root, { recursive: true, force: true }));

@@ -11,7 +11,7 @@ test(
   'hosted accounts isolate credentials, background translations, files and corrections across restarts',
   { timeout: 40000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-hosted-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-hosted-'));
     const socket = net.createServer().listen(0, '127.0.0.1');
     await once(socket, 'listening');
     const port = (socket.address() as net.AddressInfo).port;
@@ -88,7 +88,11 @@ test(
     const request = (cookie: string, route: string, method = 'GET', body?: unknown) =>
       fetch(origin + route, {
         method,
-        headers: { Cookie: cookie, 'X-Yesilcam-Request': '1', 'Content-Type': 'application/json' },
+        headers: {
+          Cookie: cookie,
+          'X-Subtitle-Foundry-Request': '1',
+          'Content-Type': 'application/json',
+        },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         redirect: 'manual',
       });

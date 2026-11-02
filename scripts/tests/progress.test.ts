@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { after, test } from 'node:test';
 
-const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-progress-'));
+const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-progress-'));
 process.env.DATA_DIR = fixtureRoot;
 after(() => fs.rm(fixtureRoot, { recursive: true, force: true }));
 const { config } = await import('../../config.js');
@@ -82,15 +82,15 @@ test('worker progress survives split lines and awaits ordered persistence before
     await new Promise((resolve) => setTimeout(resolve, value.completed === 1 ? 10 : 0));
     values.push(value.completed);
   });
-  reader.push('ordinary log\nYESILCAM_PRO');
-  reader.push('GRESS {"completed":1,"total":2}\r\nYESILCAM_PROGRESS {"completed":');
+  reader.push('ordinary log\nSUBTITLE_FOUNDRY_PRO');
+  reader.push('GRESS {"completed":1,"total":2}\r\nSUBTITLE_FOUNDRY_PROGRESS {"completed":');
   reader.push('2,"total":2}');
   await reader.finish();
   assert.deepEqual(values, [1, 2]);
   const failed = progressLines(async () => {
     throw new Error('disk full');
   });
-  failed.push('YESILCAM_PROGRESS {}\n');
+  failed.push('SUBTITLE_FOUNDRY_PROGRESS {}\n');
   await assert.rejects(failed.finish(), /disk full/);
 });
 test('retrying preparation cannot bypass review; legacy review pauses still work', () => {
@@ -351,7 +351,11 @@ test(
       assert.equal((await get('/api/jobs/review-http/audio/0/vocals')).status, 401);
       const login = await get('/api/auth/login', {
         method: 'POST',
-        headers: { 'X-Yesilcam-Request': '1', Origin: origin, 'Content-Type': 'application/json' },
+        headers: {
+          'X-Subtitle-Foundry-Request': '1',
+          Origin: origin,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ password: 'progress-test-password-123' }),
       });
       assert.equal(login.status, 200);

@@ -84,7 +84,7 @@ export async function downloadVideo(youtubeUrl: string, id: string, options: Pip
         '--newline',
         '--progress',
         '--progress-template',
-        'download:YESILCAM_PROGRESS {"downloaded_bytes":%(progress.downloaded_bytes|null)j,"total_bytes":%(progress.total_bytes|null)j,"total_bytes_estimate":%(progress.total_bytes_estimate|null)j,"status":%(progress.status|null)j}',
+        'download:SUBTITLE_FOUNDRY_PROGRESS {"downloaded_bytes":%(progress.downloaded_bytes|null)j,"total_bytes":%(progress.total_bytes|null)j,"total_bytes_estimate":%(progress.total_bytes_estimate|null)j,"status":%(progress.status|null)j}',
         '--progress-delta',
         '5',
         '--max-filesize',

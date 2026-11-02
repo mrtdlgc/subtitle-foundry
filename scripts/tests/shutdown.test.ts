@@ -12,7 +12,7 @@ test(
   'SIGTERM drains a submitted paid response to disk and leaves the next film queued',
   { timeout: 20000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-shutdown-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-shutdown-'));
     process.env.DATA_DIR = root;
     const { config } = await import('../../config.js');
     const { run, childEnvironment } = await import('../lib/process.js');

@@ -1,7 +1,7 @@
 {
-  "name": "yesilcam-subtitle-pipeline",
+  "name": "subtitle-foundry",
   "version": "2.0.0",
-  "description": "Automated subtitle generation pipeline for Yeşilçam films",
+  "description": "A modular subtitle workbench with pluggable transcription, alignment, translation, and review.",
   "main": "build/server.js",
   "type": "module",
   "scripts": {
@@ -15,12 +15,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs:providers": "tsx scripts/generate-provider-docs.ts",
-    "test:browser": "npm run build && node scripts/tests/hybrid-browser.mjs && node scripts/tests/hosted-browser.mjs"
+    "test:browser": "npm run build && node scripts/tests/branding-browser.mjs && node scripts/tests/hybrid-browser.mjs && node scripts/tests/hosted-browser.mjs"
   },
   "keywords": [
     "subtitles",
-    "whisper",
-    "yesilcam"
+    "transcription",
+    "translation",
+    "alignment",
+    "llm",
+    "modular-pipeline"
   ],
   "author": "",
   "license": "AGPL-3.0-only",

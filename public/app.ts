@@ -80,7 +80,7 @@ async function request(url: string, options: RequestInit = {}): Promise<any> {
   const response = await fetch(`${BASE}${url}`, {
     ...options,
     headers: {
-      'X-Yesilcam-Request': '1',
+      'X-Subtitle-Foundry-Request': '1',
       ...(cached ? { 'If-None-Match': cached.etag } : {}),
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
@@ -1217,7 +1217,7 @@ async function upload(file: File) {
         xhr.open('POST', `${BASE}/api/upload-audio?${query}`);
         xhr.timeout = 31 * 60 * 1000;
         xhr.setRequestHeader('Content-Type', 'audio/flac');
-        xhr.setRequestHeader('X-Yesilcam-Request', '1');
+        xhr.setRequestHeader('X-Subtitle-Foundry-Request', '1');
         xhr.upload.onprogress = (event) =>
           progress(
             `Sending audio only (${(audio.size / 1024 ** 2).toFixed(1)} MiB)…`,

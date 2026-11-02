@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import { after, test } from 'node:test';
 import type { StageUpdate } from '../../types/pipeline.js';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-embedded-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-embedded-'));
 process.env.DATA_DIR = root;
 delete process.env.OPENSUBTITLES_API_KEY;
 delete process.env.OPENSUBTITLES_TOKEN;
@@ -558,7 +558,7 @@ test(
     const request = (route: string, options: RequestInit = {}) =>
       originalFetch(origin + route, {
         ...options,
-        headers: { Cookie: cookie, 'X-Yesilcam-Request': '1', ...options.headers },
+        headers: { Cookie: cookie, 'X-Subtitle-Foundry-Request': '1', ...options.headers },
         signal: AbortSignal.timeout(3000),
       });
     try {

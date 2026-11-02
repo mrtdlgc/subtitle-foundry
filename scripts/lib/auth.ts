@@ -50,7 +50,7 @@ export async function initializePassword(): Promise<void> {
   await writeJson(passwordFile, await recordFor(process.env.APP_PASSWORD));
 }
 export function installAuth(router: Router, origin: URL, base: string): RequestHandler {
-  const name = 'yesilcam_session';
+  const name = 'subtitle-foundry_session';
   const cookieOptions = {
     httpOnly: true,
     secure: origin.protocol === 'https:',

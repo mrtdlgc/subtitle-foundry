@@ -17,7 +17,7 @@ test(
   'batch controls bound work, stop after failure, retain receipts, protect review media and survive restart',
   { timeout: 30000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-batch-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-batch-'));
     const fake = path.join(root, 'codex');
     await fs.writeFile(
       fake,
@@ -101,7 +101,7 @@ process.stdin.on('end', () => {
         headers: {
           Cookie: cookie,
           'Content-Type': 'application/json',
-          'X-Yesilcam-Request': '1',
+          'X-Subtitle-Foundry-Request': '1',
           ...extra,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),

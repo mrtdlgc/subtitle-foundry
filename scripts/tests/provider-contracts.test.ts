@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { after, test } from 'node:test';
 import type { CloudContext } from '../../types/providers.js';
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-contracts-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-contracts-'));
 process.env.DATA_DIR = root;
 after(() => fs.rm(root, { recursive: true, force: true }));
 const { config } = await import('../../config.js');

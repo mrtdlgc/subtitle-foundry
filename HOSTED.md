@@ -21,7 +21,7 @@ SCANNER_ENABLED=false
 TRANSCRIBE_BACKEND=elevenlabs
 KEEP_INTERMEDIATES=false
 CHATGPT_PLAN_USAGE_ENABLED=false
-SOURCE_URL=https://github.com/mrtdlgc/yesilcam-pipeline
+SOURCE_URL=https://github.com/mrtdlgc/subtitle-foundry
 ```
 
 `APP_PASSWORD` is used only in personal mode. Configure your HTTPS proxy and `TRUSTED_PROXIES`

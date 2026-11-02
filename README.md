@@ -1,12 +1,22 @@
-# Yeşilçam Revival
+# Subtitle Foundry
 
-A subtitle studio for films that deserve a wider audience. Prepare local movies in the browser,
-reuse embedded subtitles, and transcribe missing dialogue with **direct ElevenLabs Scribe v2**.
-Preserve word timings and speaker turns for contextual translation, then watch and correct the
-result. Other cloud transcription providers remain selectable.
+<img src="public/favicon.svg" alt="" width="64" height="64" />
+
+**A modular subtitle workbench with pluggable transcription, alignment, translation, and review.**
+
+Build the workflow your source needs. Reuse embedded subtitles or choose a transcription provider;
+keep native word timing or select an alignment stage; translate with full dialogue context or
+preserve exact cue timings. Watch, edit, and export the result. Each stage keeps its own artifacts
+and checkpoints so you can inspect the work, change supported settings, and resume without repeating
+completed provider requests.
+
+Local media preparation, optional speech detection, speaker-aware cues, translation, and manual
+review are distinct parts of the pipeline. Choose the applicable stages and providers through the
+studio and configuration. The default transcription route uses **direct ElevenLabs Scribe v2**;
+other cloud providers and optional local ASR remain available.
 
 Source is available under **AGPL-3.0-only** in the
-[GitHub repository](https://github.com/mrtdlgc/yesilcam-pipeline). Runtime media, credentials and
+[GitHub repository](https://github.com/mrtdlgc/subtitle-foundry). Runtime media, credentials and
 account state are excluded. Historical implementation notes are in [docs/history](docs/history/).
 See [the Opus audit remediation record](AUDIT_FIXES.md).
 
@@ -35,9 +45,11 @@ optional build additions. Demucs is no longer installed or invoked. The image in
 Codex CLI with Linux ARM64 packaging; sign in once inside the deployed container using device login.
 See the [ARM batch operation guide](BATCH_OPERATIONS.md) for exact setup and recovery steps.
 
-For Hermes running on the deployment host, the [operator skill](skills/yesilcam-operator/SKILL.md)
-covers deployment, batch controls, transcription/translation recovery, and review. Install the file
-at `~/.hermes/skills/yesilcam-operator/SKILL.md` and invoke `/yesilcam-operator` in a new session.
+For Hermes running on the deployment host, the
+[operator skill](skills/subtitle-foundry-operator/SKILL.md) covers deployment, batch controls,
+transcription/translation recovery, and review. Install the file at
+`~/.hermes/skills/subtitle-foundry-operator/SKILL.md` and invoke `/subtitle-foundry-operator` in a
+new session.
 
 Read [deployment, storage, password recovery, and the acceptance checklist](DEPLOYMENT.md) before
 your first deployment. Strict TypeScript migration details are in

@@ -12,7 +12,7 @@ test(
   'one manual scan accepts stable files and defers files still changing with watching off',
   { timeout: 12000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-scanner-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-scanner-'));
     await fs.mkdir(path.join(root, 'movies'), { recursive: true });
     await fs.mkdir(path.join(root, 'data'), { recursive: true });
     const processed: Record<string, { filename: string; at: string; jobId: string }> = {};
@@ -62,7 +62,11 @@ test(
     const request = (route: string, body?: unknown, cookie = '') =>
       fetch(origin + route, {
         method: body === undefined ? 'GET' : 'POST',
-        headers: { Cookie: cookie, 'Content-Type': 'application/json', 'X-Yesilcam-Request': '1' },
+        headers: {
+          Cookie: cookie,
+          'Content-Type': 'application/json',
+          'X-Subtitle-Foundry-Request': '1',
+        },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(4000),
       });

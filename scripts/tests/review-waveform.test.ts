@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-waveform-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-waveform-'));
 process.env.DATA_DIR = root;
 after(() => fs.rm(root, { recursive: true, force: true }));
 const { at } = await import('../lib/files.js');

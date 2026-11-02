@@ -1,10 +1,13 @@
 import type { LocalWaveform } from './local-types.js';
+import { legacyWaveformDatabase } from './storage-compat.js';
 
 // Share File references between studio and editor tabs. Never put a movie in IndexedDB.
 const files = new Map<string, File>();
 const channel =
   typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function'
-    ? new BroadcastChannel(`yesilcam-local-media:${new URL('./', import.meta.url).pathname}`)
+    ? new BroadcastChannel(
+        `subtitle-foundry-local-media:${new URL('./', import.meta.url).pathname}`,
+      )
     : null;
 channel?.addEventListener('message', (event) => {
   const { kind, id, request } = event.data ?? {};
@@ -40,12 +43,20 @@ export async function recallLocalFile(id: string): Promise<File | null> {
   });
 }
 
-async function cache(key: string, value?: LocalWaveform): Promise<LocalWaveform | null> {
+async function cache(
+  key: string,
+  value?: LocalWaveform,
+  database = 'subtitle-foundry-local-waveforms',
+): Promise<LocalWaveform | null> {
   // Waveforms are small; failure to persist must never prevent playback or editing.
   try {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('yesilcam-local-waveforms', 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('waveforms');
+      const request = indexedDB.open(database, 1);
+      request.onupgradeneeded = () => {
+        // A fresh installation must not create a database under the retired name.
+        if (database === legacyWaveformDatabase) request.transaction?.abort();
+        else request.result.createObjectStore('waveforms');
+      };
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
@@ -65,5 +76,11 @@ async function cache(key: string, value?: LocalWaveform): Promise<LocalWaveform 
     return value ?? null;
   }
 }
-export const readLocalWaveform = (key: string) => cache(key);
+export async function readLocalWaveform(key: string): Promise<LocalWaveform | null> {
+  const current = await cache(key);
+  if (current) return current;
+  const previous = await cache(key, undefined, legacyWaveformDatabase);
+  if (previous) await cache(key, previous);
+  return previous;
+}
 export const saveLocalWaveform = (key: string, value: LocalWaveform) => cache(key, value);

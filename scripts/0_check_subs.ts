@@ -37,7 +37,7 @@ export async function searchOpenSubtitles({
   if (!key) return null;
   const headers: Record<string, string> = {
     'Api-Key': key,
-    'User-Agent': (await credential('OPENSUBTITLES_USER_AGENT')) || 'YesilcamRevival v1.0',
+    'User-Agent': (await credential('OPENSUBTITLES_USER_AGENT')) || 'SubtitleFoundry v1.0',
     'Content-Type': 'application/json',
   };
   const token = await credential('OPENSUBTITLES_TOKEN');

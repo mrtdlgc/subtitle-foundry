@@ -97,7 +97,7 @@ export function stopStages(
 // and drain it before declaring the stage finished; ordinary logs are ignored.
 export function progressLines(
   onValue: (value: Record<string, any>) => void | Promise<void>,
-  prefix = 'YESILCAM_PROGRESS ',
+  prefix = 'SUBTITLE_FOUNDRY_PROGRESS ',
 ) {
   let buffer = '',
     pending = Promise.resolve();

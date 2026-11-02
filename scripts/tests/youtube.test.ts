@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-youtube-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-youtube-'));
 process.env.DATA_DIR = root;
 process.env.APP_MODE = 'personal';
 delete process.env.YOUTUBE_BROWSER;

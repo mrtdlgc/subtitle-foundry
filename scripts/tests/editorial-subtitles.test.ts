@@ -5,7 +5,7 @@ import os from 'node:os';
 import { after, test } from 'node:test';
 import type { Segment } from '../../types/pipeline.js';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-editorial-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-editorial-'));
 process.env.DATA_DIR = root;
 after(() => fs.rm(root, { recursive: true, force: true }));
 const { editorialSource, editorialPrompt, validateEditorialTranslation } =

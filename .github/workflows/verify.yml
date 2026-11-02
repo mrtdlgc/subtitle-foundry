@@ -27,10 +27,10 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Build cloud image
-        run: docker build --tag yesilcam-ci .
+        run: docker build --tag subtitle-foundry-ci .
       - name: Smoke image without provider credentials
         run: |
-          docker run -d --name studio-ci -p 127.0.0.1:3000:3000 -e APP_PASSWORD=ci-disposable-password -e PUBLIC_ORIGIN=http://127.0.0.1:3000 yesilcam-ci
+          docker run -d --name studio-ci -p 127.0.0.1:3000:3000 -e APP_PASSWORD=ci-disposable-password -e PUBLIC_ORIGIN=http://127.0.0.1:3000 subtitle-foundry-ci
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:3000/health; then break; fi
             sleep 1

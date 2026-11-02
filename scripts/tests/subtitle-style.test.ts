@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-style-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-style-'));
 process.env.DATA_DIR = root;
 const {
   formatSubtitleDocument,

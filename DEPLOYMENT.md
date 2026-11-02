@@ -1,4 +1,16 @@
-# Deploying Yeşilçam Revival
+# Deploying Subtitle Foundry
+
+## Upgrading an existing installation
+
+Keep the existing `DATA_DIR` and media volumes when updating the application. The rebrand does not
+move jobs, provider credentials, source files, or saved subtitle corrections. Sign in again after
+the update because the application session cookies have new names. Reload open studio/editor tabs so
+they use the current request header and local-media channel.
+
+Browser correction drafts and playback notes migrate to the new storage keys on first use. Cached
+waveforms and previously prepared local screening copies remain readable. The old identifiers in
+`public/storage-compat.ts` are compatibility readers, not active branding. Existing deployment
+folder names may stay in place; changing them is not required to use the new app.
 
 The default image targets a **CPU host with cloud transcription**. It includes Node 24, Python 3.12,
 FFmpeg, yt-dlp with its matching EJS solver, and pinned Codex CLI 0.164.0. PyTorch/Silero and
@@ -78,8 +90,8 @@ the configured port. Set `TRUSTED_PROXIES` to the actual reverse-proxy IPs/CIDRs
 backoff uses each client address. Never use a blanket trust setting or allow direct clients to forge
 the trusted proxy source.
 
-For a subpath, set `BASE_PATH=/revival`, keep `PUBLIC_ORIGIN` as the origin alone, and forward
-`/revival/...` without stripping the prefix. `/health` stays at the root. A dedicated subdomain is
+For a subpath, set `BASE_PATH=/foundry`, keep `PUBLIC_ORIGIN` as the origin alone, and forward
+`/foundry/...` without stripping the prefix. `/health` stays at the root. A dedicated subdomain is
 simpler.
 
 Coolify's current [Dockerfile workflow](https://coolify.io/docs/applications/builds/dockerfile),

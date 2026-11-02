@@ -84,7 +84,7 @@ interface Account {
 const failures = new Map<string, { count: number; reset: number }>();
 let hashing = 0;
 const busy = new Set<string>();
-const COOKIE = 'yesilcam_account';
+const COOKIE = 'subtitle-foundry_account';
 export function sessionId(req: Request) {
   const value = req.headers.cookie
     ?.split(';')

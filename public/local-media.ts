@@ -2,6 +2,7 @@ import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import type { LocalMedia, LocalWaveform } from './local-types.js';
 import { embeddedTracks, rankedSubtitleTracks, subtitleLanguage } from './subtitle-tracks.js';
 import { parseSrt } from './subtitle-text.js';
+import { matchesPreparedMediaTag } from './storage-compat.js';
 
 type Progress = (message: string, percentage?: number) => void;
 const root = new URL('./', import.meta.url);
@@ -460,7 +461,7 @@ export async function localScreening(
         '-map_metadata',
         '-1',
         '-metadata',
-        `comment=yesilcam-local:${media.fingerprint}`,
+        `comment=subtitle-foundry-local:${media.fingerprint}`,
         '-movflags',
         '+faststart',
         '-fs',
@@ -496,7 +497,7 @@ export async function matchLocalFile(
   try {
     const info = await inspect(ffmpeg, input);
     if (
-      info.format.tags?.comment === `yesilcam-local:${media.fingerprint}` &&
+      matchesPreparedMediaTag(info.format.tags?.comment, media.fingerprint) &&
       Math.abs(Number(info.format.duration) - media.duration) < 0.25
     )
       return { ...media, audioStreamIndex: 0, requiresLocalScreening: false };

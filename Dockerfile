@@ -47,7 +47,7 @@ COPY --from=javascript /app/package.json ./package.json
 COPY --from=javascript /app/LICENSE ./LICENSE
 COPY --from=javascript /app/node_modules ./node_modules
 COPY --from=javascript /app/build ./build
-COPY --chmod=755 scripts/container-entrypoint.sh /usr/local/bin/yesilcam-entrypoint
+COPY --chmod=755 scripts/container-entrypoint.sh /usr/local/bin/subtitle-foundry-entrypoint
 USER 10001:10001
 RUN node node_modules/@openai/codex/bin/codex.js --version \
     && /opt/audio/bin/yt-dlp --version
@@ -56,5 +56,5 @@ EXPOSE 3000
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/yesilcam-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/subtitle-foundry-entrypoint"]
 CMD ["node", "build/server.js"]

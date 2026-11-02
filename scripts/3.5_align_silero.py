@@ -25,7 +25,7 @@ def main():
         for i, chunk in enumerate(chunks):
             print(f'Silero profile {i + 1}/{len(chunks)}', file=sys.stderr, flush=True)
             save_json(Path(args.output) / f'profile_{chunk["id"]}.json', profile_audio(chunk['file'], model))
-            print('YESILCAM_PROGRESS ' + json.dumps({'completed': i + 1, 'total': len(chunks), 'detail': f'Speech profile {i + 1}/{len(chunks)} saved'}), file=sys.stderr, flush=True)
+            print('SUBTITLE_FOUNDRY_PROGRESS ' + json.dumps({'completed': i + 1, 'total': len(chunks), 'detail': f'Speech profile {i + 1}/{len(chunks)} saved'}), file=sys.stderr, flush=True)
     elif args.audio_file:
         result = profile_audio(args.audio_file, model)
         if args.output:

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { chromium } from 'playwright';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-hosted-browser-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-hosted-browser-'));
 const socket = net.createServer().listen(0, '127.0.0.1');
 await once(socket, 'listening');
 const port = socket.address().port;
@@ -25,7 +25,7 @@ const server = spawn(process.execPath, ['build/server.js'], {
     PORT: String(port),
     PUBLIC_ORIGIN: origin,
     BASE_PATH: '',
-    SOURCE_URL: 'https://github.com/mrtdlgc/yesilcam-pipeline',
+    SOURCE_URL: 'https://github.com/mrtdlgc/subtitle-foundry',
     SCANNER_ENABLED: 'false',
     SHUTDOWN_GRACE_MS: '1000',
     CODEX_BIN: '/not-available',
@@ -95,14 +95,14 @@ try {
     false,
   );
   assert.equal(await page.locator('[data-view=library]').isVisible(), false);
-  await page.screenshot({ path: '/tmp/yesilcam-hosted-connections.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/subtitle-foundry-hosted-connections.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     true,
     'mobile has no horizontal overflow',
   );
-  await page.screenshot({ path: '/tmp/yesilcam-hosted-mobile.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/subtitle-foundry-hosted-mobile.png', fullPage: true });
   await page.locator('#logoutBtn').click();
   await page.locator('#login').fill('browser_user');
   await page.locator('#password').fill('browser-fixture-password');

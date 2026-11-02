@@ -558,7 +558,7 @@ app.use((req, res, next) => {
     return res.status(403).json({ error: 'Cross-site requests are disabled' });
   if (
     !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
-    req.headers['x-yesilcam-request'] !== '1'
+    req.headers['x-subtitle-foundry-request'] !== '1'
   ) {
     return res.status(403).json({ error: 'Missing application request header' });
   }
@@ -589,7 +589,7 @@ router.get('/app-config.js', (req, res) =>
       `window.APP_HOSTED=${hosted};window.APP_BASE_PATH=${JSON.stringify(BASE_PATH)};window.APP_DEFAULT_LANGUAGE=${JSON.stringify(config.DEFAULT_LANGUAGE)};window.APP_TARGET_LANGUAGE=${JSON.stringify(config.TARGET_LANGUAGE)};window.APP_MAX_UPLOAD_BYTES=${config.MAX_UPLOAD_BYTES};window.APP_MAX_INPUT_DURATION_SEC=${config.MAX_INPUT_DURATION_SEC};window.APP_AUDIO_STREAM_INDEX=${config.AUDIO_STREAM_INDEX};window.APP_MAX_MOVIE_AUDIO_BYTES=${config.MAX_MOVIE_AUDIO_BYTES};window.APP_KEEP_INTERMEDIATES=${config.KEEP_INTERMEDIATES};window.APP_TRANSLATION_ENABLED=${config.TRANSLATION_ENABLED};`,
     ),
 );
-const sourceUrl = new URL(process.env.SOURCE_URL || 'https://github.com/mrtdlgc/yesilcam-pipeline');
+const sourceUrl = new URL(process.env.SOURCE_URL || 'https://github.com/mrtdlgc/subtitle-foundry');
 if (sourceUrl.protocol !== 'https:' || sourceUrl.username || sourceUrl.password)
   throw new Error('SOURCE_URL must be a public HTTPS source location');
 router.get('/source', (_req, res) => res.redirect(sourceUrl.href));
@@ -1855,7 +1855,7 @@ try {
   await releaseLock();
   throw error;
 }
-console.log(`Yeşilçam Revival: ${PUBLIC_ORIGIN.origin}${BASE_PATH}/`);
+console.log(`Subtitle Foundry: ${PUBLIC_ORIGIN.origin}${BASE_PATH}/`);
 server.requestTimeout = config.MAX_UPLOAD_TIME_MS + 30000;
 const scanTimer = setInterval(() => {
   void scanMovies();

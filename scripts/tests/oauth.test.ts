@@ -12,7 +12,7 @@ test(
   'approved OAuth verifies one-use state, session, PKCE, identity and scope and rotates tokens once',
   { timeout: 15000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-oauth-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-oauth-'));
     process.env.APP_MODE = 'hosted';
     process.env.DATA_DIR = root;
     process.env.CHATGPT_PLAN_USAGE_ENABLED = 'true';

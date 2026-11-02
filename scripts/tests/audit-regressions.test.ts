@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { after, test } from 'node:test';
 import express from 'express';
 import type { Job } from '../../types/pipeline.js';
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-audit-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-audit-'));
 process.env.DATA_DIR = root;
 process.env.APP_PASSWORD = 'fixture-password-only';
 process.env.OPENSUBTITLES_API_KEY = 'fixture-key';

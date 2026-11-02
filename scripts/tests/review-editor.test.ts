@@ -10,7 +10,7 @@ test(
   'editor autosaves the right cues, previews timing, protects unfinished fields and recovers conflicts',
   { timeout: 15000 },
   async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-editor-'));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-editor-'));
     process.env.DATA_DIR = root;
     const {
       createSubtitleReview,

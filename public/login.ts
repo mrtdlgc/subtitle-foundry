@@ -67,7 +67,7 @@ form.addEventListener('submit', async (event) => {
           : { login: byId<HTMLInputElement>('login').value, password: password.value };
     const response = await fetch(`${window.APP_BASE_PATH || ''}/api/auth/${mode}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Yesilcam-Request': '1' },
+      headers: { 'Content-Type': 'application/json', 'X-Subtitle-Foundry-Request': '1' },
       body: JSON.stringify(body),
     });
     const data = await response.json().catch(() => ({}));

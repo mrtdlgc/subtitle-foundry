@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { after, test } from 'node:test';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'yesilcam-review-'));
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-review-'));
 process.env.DATA_DIR = root;
 after(() => fs.rm(root, { recursive: true, force: true }));
 const { config } = await import('../../config.js');
@@ -399,7 +399,7 @@ test(
         headers: {
           Cookie: cookie,
           'Content-Type': 'application/json',
-          'X-Yesilcam-Request': '1',
+          'X-Subtitle-Foundry-Request': '1',
           ...extra,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -475,7 +475,8 @@ test(
       assert.equal(media.status, 206);
       assert.equal((await media.arrayBuffer()).byteLength, 32);
       assert.equal(
-        (await request('/api/reviews/queued/waveform', {}, { 'X-Yesilcam-Request': '' })).status,
+        (await request('/api/reviews/queued/waveform', {}, { 'X-Subtitle-Foundry-Request': '' }))
+          .status,
         403,
       );
       const waveform = await request('/api/reviews/queued/waveform', {});
@@ -489,7 +490,7 @@ test(
         edits: [{ id: '1', texts: { en: 'Mother!' }, start: 0.2, end: 1.2 }],
       };
       assert.equal(
-        (await request('/api/reviews/queued', edit, { 'X-Yesilcam-Request': '' })).status,
+        (await request('/api/reviews/queued', edit, { 'X-Subtitle-Foundry-Request': '' })).status,
         403,
       );
       assert.equal(
