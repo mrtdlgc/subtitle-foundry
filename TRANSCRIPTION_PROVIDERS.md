@@ -3,17 +3,13 @@
 The current default is **direct ElevenLabs / `scribe_v2`**, using one continuous original-audio
 file. OpenRouter, lossless chunking, optional Silero profiling, film offsets, hallucination review,
 alignment and translation remain selectable; Demucs is no longer run or installed in the default
-image. The Ah Nerede pilot completed 18 OpenRouter requests across GPT Transcribe, Scribe v2, and
-Qwen3-ASR on original/vocal samples. Other adapters still require live verification. API contracts
-were reviewed against official documentation; account compatibility and film accuracy need the
-manual checks in [TRANSCRIPTION_COMPARISON.md](TRANSCRIPTION_COMPARISON.md).
+image. Check account compatibility and transcription quality on representative samples using
+[TRANSCRIPTION_COMPARISON.md](TRANSCRIPTION_COMPARISON.md).
 
 Direct **ElevenLabs / `scribe_v2`** now defaults to full-movie submission; explicit Short chunks
 remains available. It streams file-backed multipart data, enables diarization, and builds cues from
 native words. OpenRouter Scribe also supports speaker labels but stays chunked.
-[Full-movie setup and limits](FULL_MOVIE_SCRIBE.md). The direct path has mocked integration coverage
-and a locally reviewed 45:04 direct ElevenLabs first-half transcription. The earlier 9m51s
-continuous/chunked experiment used OpenRouter.
+[Full-movie setup and limits](FULL_MOVIE_SCRIBE.md).
 
 Choose a provider/model in **Studio**. Save API keys in **Connections**; updates apply to future
 requests without a restart or build. Secret values are encrypted on the backend and are never read

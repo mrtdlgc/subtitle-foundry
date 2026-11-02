@@ -14,18 +14,17 @@ OpenRouter remains selectable and uses short requests. Direct ElevenLabs also su
 **Short chunks**, which retains the local processing workflow. Short requests have separate speaker
 ID scopes. Identical IDs in different requests are not assumed to be the same voice.
 
-For a paused pre-ASR job such as Ah Nerede, select the new options in the form and click **Use form
-options (stay paused)** on its row. This backs up the manifest and preserves the old audio files.
-Resume prepares the new audio and pauses again for review; a second Resume permits transcription.
-Changing options is refused after any ASR request/checkpoint exists, including uncertain requests.
+For a paused pre-ASR job, select the new options in the form and click **Use form options (stay
+paused)** on its row. This backs up the manifest and preserves the old audio files. Resume prepares
+the new audio and pauses again for review; a second Resume permits transcription. Changing options
+is refused after any ASR request/checkpoint exists, including uncertain requests.
 
 ## Cost and account
 
 The published base rate is **USD 0.22 per audio hour**: approximately **USD 0.33 / 90 minutes** or
 **USD 0.44 / two hours**. This is a gross usage estimate, not the effective cost of a subscription
 or an invoice. Taxes, plan fees, available included usage and overage depend on your account.
-ElevenAPI offers pay-as-you-go as well as plans. OpenRouter credits are a separate balance. The Ah
-Nerede half-film dashboard observation used a different credit conversion than this public rate. Use
+ElevenAPI offers pay-as-you-go as well as plans. OpenRouter credits are a separate balance. Use
 **Custom price / minute**, or `CLOUD_PRICE_PER_MINUTE` for scanner defaults, when your account rate
 differs. The app does not translate account credits into a verified invoice amount.
 
@@ -86,11 +85,9 @@ source video upload is governed separately by `MAX_UPLOAD_BYTES`.
   `INSTALL_LOCAL_AUDIO=true` for Silero or `INSTALL_LOCAL_WHISPER=true` for local ASR; local audio
   options use `LOCAL_AUDIO_ENABLED`. The existing native installation is not uninstalled or rebuilt.
 
-The ten-minute controlled experiment used OpenRouter and supported longer requests. Direct upload,
-recovery and speaker propagation have automated coverage using provider fixtures, including a file
-larger than the old chunk upload cap and a real one-second FFmpeg preparation. The 45:04 Ah Nerede
-first-half direct Scribe transcription and Codex translation were reviewed locally. **A complete
-feature-film submission and the ARM Docker runtime still require target-host checks.**
+Verify a short clip with your provider account before submitting a full film. Check native word
+timing, speaker transitions and actual provider usage. Measure memory and processing time on the
+deployment host before enabling unattended processing.
 
 ## Default subtitle presentation
 
@@ -126,4 +123,4 @@ Sources:
 [ElevenLabs transcription API](https://elevenlabs.io/docs/api-reference/speech-to-text/convert) ·
 [Long-recording behavior](https://elevenlabs.io/docs/overview/capabilities/speech-to-text) ·
 [OpenRouter request limits](https://openrouter.ai/docs/guides/overview/multimodal/stt) ·
-[Acceptance checks](MANUAL_CHECKS.md)
+[Acceptance checks](DEPLOYMENT.md#manual-deployment-acceptance)

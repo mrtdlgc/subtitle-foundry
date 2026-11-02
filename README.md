@@ -17,8 +17,7 @@ other cloud providers and optional local ASR remain available.
 
 Source is available under **AGPL-3.0-only** in the
 [GitHub repository](https://github.com/mrtdlgc/subtitle-foundry). Runtime media, credentials and
-account state are excluded. Historical implementation notes are in [docs/history](docs/history/).
-See [the Opus audit remediation record](AUDIT_FIXES.md).
+account state are excluded.
 
 **Hosted service:** [email/username accounts and per-user BYOK](HOSTED.md), with temporary keys by
 default and optional encrypted persistence. Each user has private jobs and corrections. OpenAI API
@@ -43,19 +42,10 @@ require a session. The default image uses **original audio + cloud transcription
 FFmpeg and a YouTube downloader with Node challenge solving. PyTorch, Silero, and faster-whisper are
 optional build additions. Demucs is no longer installed or invoked. The image includes a pinned
 Codex CLI with Linux ARM64 packaging; sign in once inside the deployed container using device login.
-See the [ARM batch operation guide](BATCH_OPERATIONS.md) for exact setup and recovery steps.
-
-For Hermes running on the deployment host, the
-[operator skill](skills/subtitle-foundry-operator/SKILL.md) covers deployment, batch controls,
-transcription/translation recovery, and review. Install the file at
-`~/.hermes/skills/subtitle-foundry-operator/SKILL.md` and invoke `/subtitle-foundry-operator` in a
-new session.
+See the [deployment guide](DEPLOYMENT.md) for setup and recovery steps.
 
 Read [deployment, storage, password recovery, and the acceptance checklist](DEPLOYMENT.md) before
-your first deployment. Strict TypeScript migration details are in
-[the migration history](docs/history/MIGRATION.md). The Scribe default follows a small Ah Nerede
-comparison of original/vocal audio using GPT Transcribe, Scribe v2, and Qwen3-ASR. It is a workflow
-choice, not proof of accuracy on every film.
+your first deployment.
 
 ## Current pipeline
 
@@ -128,8 +118,8 @@ It reuses the job's prepared chunks and writes a plan plus corrected-reference a
 templates. Actual inference requires `--run --budget USD=2` (with a separate EUR allowance when
 needed). See the workflow before running. Reports preserve original film offsets, raw transcript
 WER/CER, timing flags, cache reuse and gross usage. Subscription UI transcripts can be imported for
-the same comparison. The Ah Nerede pilot exercised the OpenRouter GPT Transcribe, Scribe v2, and
-Qwen3-ASR routes; it does not validate every available provider or subtitle alignment.
+the same comparison. Evaluate the selected provider on representative audio before processing a full
+film.
 
 ## Local development
 
@@ -259,11 +249,10 @@ server restart does not bypass that stop. **Continue to ASR** explicitly resumes
 paginated players. Historical jobs also expose their saved vocal comparisons. Only committed
 archived vocal files are offered, and audio requests require the workspace login.
 
-Keep the same original/vocal pairs when refining difficult material such as _Ah Nerede_. The
-existing comparison tool can reuse selected prepared chunks across ASR models without rerunning
-separation; see [TRANSCRIPTION_COMPARISON.md](TRANSCRIPTION_COMPARISON.md). Audio review and model
-comparisons are separate steps; a completed progress bar does not establish audio or transcript
-quality.
+Keep the same audio samples when comparing transcription settings. The comparison tool can reuse
+selected prepared chunks across ASR models without rerunning separation; see
+[TRANSCRIPTION_COMPARISON.md](TRANSCRIPTION_COMPARISON.md). Audio review and model comparisons are
+separate steps; a completed progress bar does not establish audio or transcript quality.
 
 ## Translation
 

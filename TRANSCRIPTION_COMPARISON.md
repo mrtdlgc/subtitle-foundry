@@ -1,7 +1,7 @@
 # Manual transcription comparison
 
-The Ah Nerede sample comparison used OpenRouter GPT Transcribe, Scribe v2 and Qwen3-ASR on three
-original/vocal pairs. That limited run does not validate every provider or rank full-film accuracy.
+Compare providers on the same representative audio samples before selecting a route for a full film.
+A sample comparison measures those passages; it does not establish full-film accuracy.
 
 ## 1. Prepare representative audio once
 
@@ -152,8 +152,8 @@ new job, not this tool.
   report against the actual account dashboard/invoice.
 - Manual import, missing/duplicate IDs and incomplete references: reject incomplete data; original
   film offsets survive; no API call during import/planning.
-- Run the existing [MANUAL_CHECKS.md](MANUAL_CHECKS.md) for separation, alignment, queue, recovery
-  and translation after the cloud sample comparison passes.
+- Complete the [deployment acceptance checks](DEPLOYMENT.md#manual-deployment-acceptance) for
+  alignment, queue, recovery and translation after the cloud sample comparison passes.
 
 Job Details now offers the same request inspection/reconciliation controls as the CLI. Existing
 ElevenLabs transcript IDs are retrieved with GET, without another audio submission. Async/webhook

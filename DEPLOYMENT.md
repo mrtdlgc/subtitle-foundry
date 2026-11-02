@@ -19,8 +19,8 @@ neural models. Faster-whisper is optional. The Python stages remain Python; the 
 browser, orchestration, adapters, workers, and CLI tools are TypeScript.
 
 GitHub Actions builds and smoke-tests the default cloud image on native ARM64 and x64 runners. The
-target host, real account login, media playback and paid providers still need acceptance. Start with
-the [ARM batch operation guide](BATCH_OPERATIONS.md), then use the acceptance checklist below.
+target host, real account login, media playback and paid providers still need acceptance. Follow the
+setup instructions below, then complete the [acceptance checklist](#manual-deployment-acceptance).
 
 ## Native local Codex translation
 
@@ -45,9 +45,7 @@ credential store. Never bake or paste OAuth tokens into the image or app.
 
 The application performs structural verification and writes UTF-8 BOM / CRLF SRT output plus an
 integrity/readability report. Model quality, context capacity, and account allowance still need
-manual checks with a real film. The local integration was checked with a fake CLI, including the
-authenticated queue, cancellation, output rejection and cached-result reuse; no inference request
-was used for that validation.
+manual checks with a real film.
 
 ## Coolify setup
 
@@ -201,7 +199,7 @@ complete any verification before retrying.
 
 YouTube can reject a data-center IP even with fresh cookies. Such failures now give an actionable
 error; they are not treated as a successful download. Uploading a local audio/video file is the
-fallback. No successful live YouTube download has been claimed from the static checks.
+fallback.
 
 When YouTube changes again, update the pinned downloader in `requirements-download.txt`, keeping its
 `[default]` extra, and rebuild the image. API key changes do not require this.
@@ -243,7 +241,11 @@ The web upload timeout is 30 minutes. Make the reverse proxy/CDN's upload limit 
 compatible with your inputs; the app cannot override an upstream 413 or connection timeout. For
 large films, placing a stable file in `/data/movies` avoids browser upload limits. Save the default
 provider's key and enable watching in Library. The scanner respects queue pause, capacity, and
-credential availability. Its enabled state persists. See [batch controls](BATCH_OPERATIONS.md).
+credential availability. Its enabled state persists. See
+[queue and storage controls](README.md#processing-and-review). Scans use saved server defaults,
+including `TRANSLATION_ENABLED` and `CLOUD_PRICE_PER_MINUTE`, rather than unsaved Studio form
+values. **Scan now** checks once when watching is off; enabling watching does not resume a paused
+queue.
 
 Faster-whisper is excluded from the default image and disabled in its provider selector. To include
 CPU local ASR in a future build, set Docker build argument `INSTALL_LOCAL_WHISPER=true`. The image
@@ -277,10 +279,21 @@ These checks are for the owner to run after deployment:
 - [ ] Check Studio, library, translations, Connections, and the details dialog at desktop and mobile
       widths, by keyboard as well as pointer. Verify tab selection, upload progress, errors, and
       authenticated downloads.
-- [ ] Complete [audio/pipeline checks](MANUAL_CHECKS.md) and
-      [provider comparison checks](TRANSCRIPTION_COMPARISON.md), including timing, low-volume
-      dialogue, original offsets, translation round trips, cancellation, and uncertain billing
-      recovery.
+- [ ] Start with a short clip containing quiet dialogue, music and silence. Use **Pause before
+      transcription** to review prepared audio before submitting it. Follow the
+      [provider comparison guide](TRANSCRIPTION_COMPARISON.md) to check transcript quality and
+      original film offsets. Listen to speaker transitions; speaker labels are tentative voice
+      groups, not identified characters.
+- [ ] Play the SRT and ASS against the original clip, checking timing at the beginning, chunk
+      boundaries and end. Translate it and confirm cue numbers and timestamps are unchanged. In
+      [Watch & correct](SUBTITLE_REVIEW.md), edit one line and one cue time, then download both
+      languages and confirm only the intended changes appear. Preserve generated originals.
+- [ ] Pause a queued clip, restart and confirm it stays queued until resumed. Test cancellation and
+      [request recovery](README.md#recovery-and-diagnostics) on a small job; uncertain paid requests
+      must require reconciliation before a replacement submission. Redeploy with the same volume and
+      confirm outputs, login state for providers, screening media and corrections persist.
+- [ ] Process one full film before enabling watching. Check the first and final dialogue, scene
+      changes and long silences, and inspect provider usage and host memory/disk usage.
 
 Screening preparation is a separate low-priority worker and does not block the ASR queue or pause it
 on failure. Its deadline scales with media duration. Re-downloads used only to prepare a screening

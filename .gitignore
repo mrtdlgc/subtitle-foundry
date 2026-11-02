@@ -38,3 +38,14 @@ Thumbs.db
 accounts/
 *.sqlite
 *.sqlite-*
+
+# Internal working notes
+/AUDIT_FIXES.md
+/BATCH_OPERATIONS.md
+/MANUAL_CHECKS.md
+/MIGRATION.md
+/REMEDIATION.md
+/opus-audit.md
+/docs/history/
+/skills/subtitle-foundry-operator/
+/skills/yesilcam-operator/

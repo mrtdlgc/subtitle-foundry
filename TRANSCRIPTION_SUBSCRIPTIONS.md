@@ -1,8 +1,7 @@
 # Subscriptions and transcription — checked 2026-10-23
 
 The useful distinction is whether a subscription funds the documented API used by this pipeline. A
-web-app upload allowance alone is not an API credential. No plan has been purchased, account linked,
-login token read, or paid request made here.
+web-app upload allowance alone is not an API credential.
 
 ## ElevenLabs: direct API with pay-as-you-go or a plan
 

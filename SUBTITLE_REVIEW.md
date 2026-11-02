@@ -111,22 +111,20 @@ Standalone translation jobs reuse their original job's screening when linked. A 
 SRT with no film opens the text editor; **Open matching film** lets the reviewer play a local file
 without uploading it. That local file stays in the browser and must be selected on another device.
 
-## Legacy Ah Nerede screening
+## Legacy prepared screenings
 
-The older `?session=...` player remains available for the prepared Ah Nerede comparison. Its notes
-are browser-local and do not edit subtitles. New `?job=...` screenings use the backend correction
-workflow above.
+The older `?session=...` player remains available for prepared sessions. Its notes are browser-local
+and do not edit subtitles. New `?job=...` screenings use the backend correction workflow above.
 
-The review player at `review-player.html?session=ah-nerede-first-half` plays the first 45:04 of Ah
-Nerede with the unchanged Turkish Scribe v2 transcription. It uses the running studio's password
-gate and does not start a pipeline job.
+Open `review-player.html?session=SESSION_ID` to review a prepared session. It uses the running
+studio's password gate and does not start a pipeline job.
 
 ### Reviewing the legacy screening
 
 - Press Play and watch with subtitles enabled. The native video controls also provide seeking,
   volume, and fullscreen playback.
 - Click a subtitle in Dialogue to jump to one second before it. Search by dialogue text or cue
-  number, such as `563`, and filter automatic timing/layout warnings.
+  number, and filter automatic timing/layout warnings.
 - Use Replay cue or Loop selected cue to inspect a line with surrounding audio.
 - Click Note current cue to pause and select the line currently on screen. Mark Needs correction and
   describe the wrong word, timing, speaker, or missing speech.
@@ -139,14 +137,15 @@ clearing browser data. Notes never modify the SRT. Speaker IDs are tentative voi
 verified character names.
 
 When a translation is prepared, the screening includes a link to the other language. Switching
-carries the current playback time across; each language keeps its own notes and subtitle file. The
-English first-half screening uses the session ID `ah-nerede-first-half-en`.
+carries the current playback time across; each language keeps its own notes and subtitle file.
 
 ### Legacy prepared sessions
 
 Legacy sessions require an explicit `?session=SESSION_ID` URL. Put their media, `session.json` and
 subtitle tracks under `DATA_DIR/review-sessions/SESSION_ID/`. Symlinks must stay inside that root.
 These older browser-local notes are separate from the persistent `?job=JOB_ID` correction editor.
+
+## Exports and playback positions
 
 Current exports use sequential cue numbers in chronological order while the editor retains stable
 internal IDs. Original exports preserve their original IDs. Playback positions are saved separately
