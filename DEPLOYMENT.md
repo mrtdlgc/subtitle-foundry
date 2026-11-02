@@ -163,10 +163,29 @@ Node runtime. Downloads explicitly disable simulation, reject live/upcoming/over
 retries and network waits, and monitor downloaded size. This addresses the missing challenge runtime
 in the original path. See yt-dlp's [EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/ejs).
 
-If YouTube requests sign-in, paste a Netscape `cookies.txt` export into **Connections → YouTube
-cookies**. The backend decrypts it to a temporary owner-only file for each downloader invocation,
-removes it afterward, and removes abandoned cookie files at the next startup. The stored export is
-not automatically refreshed; replace expired cookies yourself.
+For a native personal installation on your computer, use **Connections → YouTube browser session**
+and save `chrome`, `firefox`, or another supported browser where you are signed in to YouTube. The
+app passes `--cookies-from-browser` to yt-dlp on every subtitle lookup and download, so it reads the
+current browser session without writing an exported cookie jar. The app saves only the browser
+selection. Changes take effect on the next request without a restart. An optional profile can be
+specified, for example `chrome:Profile 1` or `firefox:/path/to/profile`; without one, yt-dlp chooses
+the most recently accessed profile. Use a regular browser session, not a private/incognito window.
+See yt-dlp's
+[browser-cookie documentation](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
+
+The backend must run as the same desktop user with access to the browser profile and unlocked
+keyring. On Linux, reinstall `requirements-download.txt` in the downloader's Python environment to
+include SecretStorage for Chromium browsers. A desktop service may need `DBUS_SESSION_BUS_ADDRESS`
+and the desktop environment; `chrome+gnomekeyring:Default` explicitly selects the GNOME keyring.
+This setting is unavailable in hosted account mode. Docker and remote servers do not automatically
+have access to the browser on the visitor's computer.
+
+The browser setting takes precedence over any saved cookie export. Clear it to use the manual
+fallback: paste a Netscape `cookies.txt` export into **Connections → YouTube cookies**. The backend
+decrypts that export to a temporary owner-only file for each downloader invocation, removes it
+afterward, and removes abandoned cookie files at the next startup. Saved exports are not refreshed
+automatically. If browser access is rejected, sign in to YouTube in the selected profile and
+complete any verification before retrying.
 
 YouTube can reject a data-center IP even with fresh cookies. Such failures now give an actionable
 error; they are not treated as a successful download. Uploading a local audio/video file is the

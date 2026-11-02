@@ -1,10 +1,13 @@
 import { at } from './files.js';
 import { run } from './process.js';
 import type { RunOptions } from './process.js';
-import { withYouTubeCookies } from './credentials.js';
+import { credential, validateYouTubeBrowser, withYouTubeCookies } from './credentials.js';
+import { hosted } from './identity.js';
 
 export async function youtube(args: string[], options: RunOptions = {}) {
-  return withYouTubeCookies(async (cookies) => {
+  const browser = hosted ? undefined : await credential('YOUTUBE_BROWSER');
+  if (browser) validateYouTubeBrowser(browser);
+  const invoke = async (cookies?: string) => {
     try {
       return await run(
         process.env.YTDLP_BIN || 'yt-dlp',
@@ -26,6 +29,7 @@ export async function youtube(args: string[], options: RunOptions = {}) {
           '2',
           '--cache-dir',
           at('data', 'yt-dlp-cache'),
+          ...(browser ? ['--cookies-from-browser', browser] : []),
           ...(cookies ? ['--cookies', cookies] : []),
           ...args,
         ],
@@ -39,12 +43,23 @@ export async function youtube(args: string[], options: RunOptions = {}) {
           'yt-dlp is missing. Install requirements-download.txt; the Docker image includes it.',
         );
       if (
+        browser &&
+        /cookie.*database|database.*locked|could not copy|could not find.*cookies|failed to (?:load|decrypt)|keyring|secretstorage|secret service|\bDPAPI\b|\bD-Bus\b/i.test(
+          detail,
+        )
+      )
+        throw new Error(
+          'Could not read the selected browser session. Sign in to YouTube in that browser, check the profile in Connections, and run the app as the same desktop user with an unlocked keyring. Linux Chromium browsers also need SecretStorage from requirements-download.txt. A container cannot access your desktop browser automatically; use a cookies export there.',
+        );
+      if (
         /sign in|confirm you.re not a bot|cookies|HTTP Error 403|HTTP Error 429|PO Token/i.test(
           detail,
         )
       ) {
         throw new Error(
-          'YouTube rejected access from this server. Save a fresh YouTube cookies.txt export in Connections and retry, or upload the audio. Some hosting IPs remain blocked even with cookies.',
+          browser
+            ? 'YouTube rejected the selected browser session. Open YouTube in that browser/profile, sign in and complete any verification, then retry. You can also upload local audio; cookies do not guarantee access.'
+            : 'YouTube rejected access from this server. In a local installation, select your browser in Connections → YouTube browser session, or save a fresh cookies.txt export and retry. You can also upload audio. Some hosting IPs remain blocked even with cookies.',
         );
       }
       if (/challenge|javascript|js runtime|signature|nsig/i.test(detail)) {
@@ -58,5 +73,8 @@ export async function youtube(args: string[], options: RunOptions = {}) {
         );
       throw error;
     }
-  });
+  };
+  // Read fresh browser cookies for every invocation without exporting the browser's cookie jar.
+  // A selected browser takes precedence over any older saved export.
+  return browser ? invoke() : withYouTubeCookies(invoke);
 }

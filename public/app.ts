@@ -1459,6 +1459,7 @@ interface ConnectionField {
   source: string;
   value?: string;
   expires?: number | null;
+  suggestions?: string[];
 }
 async function loadConnections() {
   const { fields }: { fields: ConnectionField[] } = await request('/api/connections');
@@ -1471,6 +1472,7 @@ async function loadConnections() {
   list.replaceChildren();
   for (const field of fields) {
     const cookies = field.name === 'YOUTUBE_COOKIES';
+    const browser = field.name === 'YOUTUBE_BROWSER';
     const card = element('form', undefined, `connection-card${cookies ? ' wide' : ''}`);
     const heading = element('div', undefined, 'section-header');
     const badge = element(
@@ -1492,22 +1494,49 @@ async function loadConnections() {
     input.value = field.secret ? '' : (field.value ?? '');
     input.placeholder = cookies
       ? '# Netscape HTTP Cookie File\nPaste your exported cookies here'
-      : field.secret && field.configured
-        ? 'Saved · enter a new key to replace'
-        : field.secret
-          ? 'Paste API key'
-          : 'Enter setting';
+      : browser
+        ? 'chrome, firefox, or chrome:Profile 1'
+        : field.secret && field.configured
+          ? 'Saved · enter a new key to replace'
+          : field.secret
+            ? 'Paste API key'
+            : 'Enter setting';
     const label = element(
       'label',
-      cookies ? 'Cookies export' : field.secret ? 'API key / secret' : 'Setting',
+      cookies
+        ? 'Cookies export'
+        : browser
+          ? 'Browser (optional :profile)'
+          : field.secret
+            ? 'API key / secret'
+            : 'Setting',
     );
     label.htmlFor = input.id;
     card.append(label, input);
+    if (field.suggestions && input instanceof HTMLInputElement) {
+      const suggestions = element('datalist');
+      suggestions.id = `${input.id}-suggestions`;
+      for (const value of field.suggestions) {
+        const option = element('option');
+        option.value = value;
+        suggestions.append(option);
+      }
+      input.setAttribute('list', suggestions.id);
+      card.append(suggestions);
+    }
+    if (browser)
+      card.append(
+        element(
+          'p',
+          'Choose the browser where you are signed in to YouTube on the computer running this app. Its current session is read on each download; no cookies.txt export is needed. Add :profile to select a specific profile. Requires the same desktop user and an unlocked keyring; Docker cannot access it automatically. Clear this setting to use a saved export instead.',
+          'field-note',
+        ),
+      );
     if (cookies)
       card.append(
         element(
           'p',
-          'Use an export from an account that can access the video. Cookies grant access to that account; clear them when finished. Some server IPs are blocked by YouTube even with cookies.',
+          'Used only when no browser session is selected above. Use an export from an account that can access the video. Cookies grant access to that account; clear them when finished. Some server IPs are blocked by YouTube even with cookies.',
           'field-note',
         ),
       );

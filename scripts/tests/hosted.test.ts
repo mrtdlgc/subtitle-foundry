@@ -124,6 +124,15 @@ test(
         409,
       );
       let fields = (await json(await request(alice.cookie, '/api/connections'))).fields;
+      assert.ok(!fields.some((field: any) => field.name === 'YOUTUBE_BROWSER'));
+      assert.equal(
+        (
+          await request(alice.cookie, '/api/connections/YOUTUBE_BROWSER', 'PUT', {
+            value: 'chrome',
+          })
+        ).status,
+        403,
+      );
       assert.ok(
         fields.every((field: any) => !field.configured),
         'server environment keys are never inherited',

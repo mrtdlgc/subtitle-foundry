@@ -1,2 +1,4 @@
 # Bundles the matching EJS solver; Node is provided by the image.
 yt-dlp[default]==2026.10.21
+# Chromium browser-cookie decryption through the user's Linux desktop keyring.
+SecretStorage==3.5.0; sys_platform == "linux"

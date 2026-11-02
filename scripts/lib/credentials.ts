@@ -24,8 +24,43 @@ export const credentialFields = [
   ['OPENSUBTITLES_API_KEY', 'OpenSubtitles API key', true],
   ['OPENSUBTITLES_TOKEN', 'OpenSubtitles token', true],
   ['OPENSUBTITLES_USER_AGENT', 'OpenSubtitles user agent', false],
+  ['YOUTUBE_BROWSER', 'YouTube browser session', false],
   ['YOUTUBE_COOKIES', 'YouTube cookies (Netscape format)', true],
 ] as const;
+const youtubeBrowsers = [
+  'chrome',
+  'firefox',
+  'chromium',
+  'brave',
+  'edge',
+  'opera',
+  'safari',
+  'vivaldi',
+  'whale',
+];
+const personalConnections = new Set([
+  'TRANSCRIPTION_API_URL',
+  'TRANSCRIPTION_API_KEY',
+  'YOUTUBE_COOKIES',
+  'YOUTUBE_BROWSER',
+]);
+export function validateYouTubeBrowser(value: string): string {
+  const match =
+    /^([a-z]+)(?:\+(basictext|gnomekeyring|kwallet|kwallet5|kwallet6))?(?::(.+))?$/.exec(value);
+  if (
+    value.length > 1024 ||
+    /[\x00-\x1f\x7f]/.test(value) ||
+    !match ||
+    !youtubeBrowsers.includes(match[1])
+  )
+    throw Object.assign(
+      new Error(
+        'Choose a supported browser, optionally followed by :profile (for example chrome:Default or firefox)',
+      ),
+      { status: 400 },
+    );
+  return value;
+}
 export type CredentialName = (typeof credentialFields)[number][0];
 interface Envelope {
   iv: string;
@@ -236,10 +271,7 @@ export async function credential(name: string | null): Promise<string | undefine
 export async function credentialStatus() {
   if (hosted)
     return credentialFields
-      .filter(
-        ([name]) =>
-          !['TRANSCRIPTION_API_URL', 'TRANSCRIPTION_API_KEY', 'YOUTUBE_COOKIES'].includes(name),
-      )
+      .filter(([name]) => !personalConnections.has(name))
       .map(([name, label, secret]) => {
         const connection = accountConnection(name);
         return {
@@ -259,6 +291,7 @@ export async function credentialStatus() {
       name,
       label,
       secret,
+      ...(name === 'YOUTUBE_BROWSER' ? { suggestions: youtubeBrowsers } : {}),
       configured: Boolean(await credential(name)),
       source:
         vault.values[name] === null
@@ -285,6 +318,7 @@ function validateValue(name: CredentialName, value: unknown): string {
       throw Object.assign(new Error('Use a Netscape cookies.txt export'), { status: 400 });
   } else if (/[\x00-\x1f\x7f]/.test(text))
     throw Object.assign(new Error('Connection value contains invalid characters'), { status: 400 });
+  if (name === 'YOUTUBE_BROWSER') validateYouTubeBrowser(text);
   if (name === 'SPEECHMATICS_REGION' && !['eu1', 'us1'].includes(text))
     throw Object.assign(new Error('Choose eu1 or us1'), { status: 400 });
   if (name === 'TRANSCRIPTION_API_URL') {
@@ -322,7 +356,7 @@ export async function saveCredential(
   const field = credentialName(name),
     text = validateValue(field, value);
   if (hosted) {
-    if (['TRANSCRIPTION_API_URL', 'TRANSCRIPTION_API_KEY', 'YOUTUBE_COOKIES'].includes(field))
+    if (personalConnections.has(field))
       throw Object.assign(
         new Error('This connection is available only in personal installations'),
         { status: 403 },
