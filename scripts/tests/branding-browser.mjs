@@ -30,6 +30,8 @@ const server = spawn(process.execPath, ['build/server.js'], {
     SCANNER_ENABLED: 'false',
     SHUTDOWN_GRACE_MS: '1000',
     CODEX_BIN: '/not-available',
+    CLAUDE_BIN: '/not-available',
+    GROK_BIN: '/not-available',
     YTDLP_BIN: '/not-available',
     LOCAL_AUDIO_ENABLED: 'false',
   },
@@ -85,6 +87,77 @@ try {
   assert.ok(
     (await page.context().cookies()).some((cookie) => cookie.name === 'subtitle-foundry_session'),
   );
+
+  await page.locator('#pipelineTranslationOptions').waitFor();
+  assert.equal(await page.locator('#pipelineTranslationConnection').inputValue(), 'codex-local');
+  assert.deepEqual(
+    await page
+      .locator('#pipelineTranslationConnection option')
+      .evaluateAll((options) => options.slice(0, 3).map((option) => option.value)),
+    ['codex-local', 'claude-local', 'grok-local'],
+  );
+  await page.locator('#pipelineTranslationConnection').selectOption('claude-local');
+  await page.locator('#pipelineTranslationModel').fill('sonnet');
+  await page.locator('[data-view="translations"]').click();
+  assert.equal(await page.locator('#translationConnection').inputValue(), 'claude-local');
+  assert.equal(await page.locator('#codexModel').inputValue(), 'sonnet');
+  await page.locator('#translationConnection').selectOption('grok-local');
+  await page.locator('#codexModel').fill('grok-model');
+  assert.equal(await page.locator('#pipelineTranslationConnection').inputValue(), 'grok-local');
+  assert.equal(await page.locator('#pipelineTranslationModel').inputValue(), 'grok-model');
+  await page.locator('#translationConnection').selectOption('xai-api');
+  assert.equal(await page.locator('#codexModel').inputValue(), '');
+  assert.ok(await page.locator('#startCodexTranslation').isDisabled());
+  await page.locator('#translationConnection').selectOption('openrouter-api');
+  assert.equal(await page.locator('#codexModel').inputValue(), '');
+  assert.ok(await page.locator('#startCodexTranslation').isDisabled());
+  await page.locator('#codexModel').fill('vendor/model');
+  await page.locator('#translationConnection').selectOption('claude-local');
+  assert.equal(await page.locator('#codexModel').inputValue(), 'sonnet');
+  await page.locator('#translationConnection').selectOption('openrouter-api');
+  assert.equal(await page.locator('#codexModel').inputValue(), 'vendor/model');
+  await page.evaluate(async () => {
+    const response = await fetch('/api/connections/OPENROUTER_API_KEY', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Subtitle-Foundry-Request': '1' },
+      body: JSON.stringify({ value: 'browser-fixture-only' }),
+    });
+    if (!response.ok) throw new Error('Fixture connection failed');
+  });
+  await page.locator('#refreshTranslationsBtn').click();
+  await page.waitForFunction(() => !document.querySelector('#startCodexTranslation').disabled);
+  let submitted;
+  await page.route('**/api/subtitle-translations', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    submitted = route.request().postDataJSON();
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Fixture stopped before inference' }),
+    });
+  });
+  await page.locator('#translationUpload').setInputFiles({
+    name: 'fixture.srt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('1\n00:00:01,000 --> 00:00:02,000\nMerhaba.\n'),
+  });
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/subtitle-translations') &&
+        response.request().method() === 'POST',
+    ),
+    page.locator('#startCodexTranslation').click(),
+  ]);
+  assert.equal(submitted.translationProvider, 'openrouter-api');
+  assert.equal(submitted.model, 'vendor/model');
+  assert.match(submitted.content, /Merhaba/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({
+    path: '/tmp/subtitle-foundry-translation-providers-mobile.png',
+    fullPage: true,
+  });
 
   const result = await page.evaluate(async () => {
     const { reviewStorageKey } = await import('./storage-compat.js');

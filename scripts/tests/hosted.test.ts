@@ -146,6 +146,24 @@ test(
         false,
       );
       assert.equal(
+        (await json(await request(alice.cookie, '/api/translation-status?provider=claude-local')))
+          .available,
+        false,
+      );
+      const translationCatalog = await json(
+        await request(alice.cookie, '/api/translation-providers'),
+      );
+      assert.equal(
+        (await json(await request(alice.cookie, '/api/translation-status?provider=grok-local')))
+          .available,
+        false,
+      );
+      assert.ok(translationCatalog.providers.some((provider: any) => provider.id === 'xai-api'));
+      assert.ok(translationCatalog.providers.every((provider: any) => !provider.local));
+      assert.ok(
+        translationCatalog.providers.some((provider: any) => provider.id === 'anthropic-api'),
+      );
+      assert.equal(
         (await request(alice.cookie, '/api/oauth/chatgpt/start', 'POST', {})).status,
         503,
       );

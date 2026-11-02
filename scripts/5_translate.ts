@@ -1,6 +1,7 @@
 import type { PipelineOptions } from '../types/pipeline.js';
 import { config } from '../config.js';
 import { codexStatus, translateWithCodex } from './lib/codex-translation.js';
+import { validateTranslationSettings } from './lib/translation-providers.js';
 
 export async function checkTranslationAvailable(options: PipelineOptions = {}) {
   const status = await codexStatus(options);
@@ -19,8 +20,7 @@ export async function translateSrtFile(
   options: PipelineOptions = {},
 ) {
   const settings = { ...config, ...options.settings };
-  if (!['codex-local', 'openai-api', 'chatgpt-oauth'].includes(settings.TRANSLATION_PROVIDER))
-    throw new Error('Choose a supported translation connection');
+  validateTranslationSettings(settings);
   return translateWithCodex(
     input,
     outputPath,

@@ -24,6 +24,13 @@ setup instructions below, then complete the [acceptance checklist](#manual-deplo
 
 ## Native local Codex translation
 
+Personal installations also support the server user's **Claude Code and Grok Build browser logins**.
+Select the subscription connection in Studio or the translation desk; API billing is an explicit
+separate choice. Codex and Claude Code are bundled in the Docker image; Grok Build requires a
+separate CLI installation in the environment running the app and `grok login --oauth`. See
+[translation connections](TRANSLATION_PROVIDERS.md) for login, model selection and persistent
+storage.
+
 The **Translations** page uses an installed Codex CLI and the server OS user's existing ChatGPT
 login. It sends the complete SRT as one task, uses the subscription allowance, and never reads OAuth
 tokens or switches to paid API-key translation. Sign in with `codex login` on that machine; set

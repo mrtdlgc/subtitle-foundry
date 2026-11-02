@@ -2,8 +2,7 @@ import { prepareLocalMedia } from './local-media.js';
 import { rememberLocalFile } from './local-files.js';
 const BASE = window.APP_BASE_PATH || '';
 const hosted = window.APP_HOSTED === true;
-const translationProvider = () =>
-  hosted ? $<HTMLSelectElement>('translationConnection').value : 'codex-local';
+const translationProvider = () => $<HTMLSelectElement>('translationConnection').value;
 function $<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing interface element: ${id}`);
@@ -12,6 +11,7 @@ function $<T extends HTMLElement = HTMLElement>(id: string): T {
 let selectedJobId: string | null = null,
   refreshing = false;
 let providersReady = false;
+let translationProvidersReady = false;
 let translationOffset = 0;
 let jobOffset = 0,
   queuePaused = false,
@@ -105,7 +105,7 @@ async function request(url: string, options: RequestInit = {}): Promise<any> {
 const post = (url: string, data?: unknown) =>
   request(url, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) });
 function languages() {
-  if (!providersReady)
+  if (!providersReady || !translationProvidersReady)
     throw new Error('Wait for the provider catalog to load, then choose a connection');
   return {
     sourceLanguage: $<HTMLInputElement>('sourceLanguage').value.trim(),
@@ -866,8 +866,84 @@ function renderSubtitleFiles(files: { filename: string }[]) {
   );
   select.value = files.some((file) => file.filename === previous) ? previous : '';
 }
+async function initializeTranslationProviders() {
+  const catalog: {
+    providers: {
+      id: string;
+      name: string;
+      kind: string;
+      local: boolean;
+      defaultModel: string;
+      billing: string;
+    }[];
+    defaultProvider: string;
+    defaultModel: string;
+  } = await request('/api/translation-providers');
+  const ids = ['translationConnection', 'pipelineTranslationConnection'];
+  const models = new Map<string, string>();
+  models.set(catalog.defaultProvider, catalog.defaultModel);
+  let selected = catalog.defaultProvider;
+  const modelInput = $<HTMLInputElement>('codexModel');
+  const pipelineModel = $<HTMLInputElement>('pipelineTranslationModel');
+  const update = (id: string) => {
+    const provider = catalog.providers.find((item) => item.id === id);
+    if (!provider) throw new Error('Choose a supported translation provider');
+    for (const select of ids) $<HTMLSelectElement>(select).value = id;
+    for (const input of [modelInput, pipelineModel]) {
+      input.value = models.get(id) ?? provider.defaultModel;
+      input.placeholder = provider.local
+        ? 'Use your subscription’s default model'
+        : provider.defaultModel || 'Enter a model ID from your provider';
+      input.required = input === modelInput && provider.kind === 'api' && !provider.defaultModel;
+    }
+    $('translationBillingNote').textContent =
+      provider.billing + ' No automatic provider or billing fallback.';
+    $('pipelineTranslationNote').textContent = provider.billing;
+    $<HTMLButtonElement>('startCodexTranslation').disabled = true;
+    selected = id;
+  };
+  for (const id of ids) {
+    const select = $<HTMLSelectElement>(id);
+    select.replaceChildren(
+      ...catalog.providers.map((provider) => {
+        const option = element('option', provider.name);
+        option.value = provider.id;
+        option.disabled = provider.id === 'chatgpt-oauth';
+        return option;
+      }),
+    );
+    select.addEventListener('change', () => {
+      models.set(selected, modelInput.value);
+      update(select.value);
+      void loadCodexStatus().catch((error) => notice(error.message));
+    });
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  for (const input of [modelInput, pipelineModel])
+    input.addEventListener('input', () => {
+      const other = input === modelInput ? pipelineModel : modelInput;
+      other.value = input.value;
+      models.set(selected, input.value);
+      $<HTMLButtonElement>('startCodexTranslation').disabled = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => void loadCodexStatus().catch((error) => notice(error.message)), 350);
+    });
+  update(selected);
+  translationProvidersReady = true;
+  for (const id of ['hostedTranslationOptions', 'pipelineTranslationOptions']) $(id).hidden = false;
+  await loadCodexStatus();
+}
 async function loadCodexStatus() {
-  const status = await request(`/api/codex?provider=${encodeURIComponent(translationProvider())}`);
+  const provider = translationProvider(),
+    model = $<HTMLInputElement>('codexModel').value.trim();
+  const status = await request(
+    `/api/translation-status?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`,
+  );
+  if (
+    translationProvider() !== provider ||
+    $<HTMLInputElement>('codexModel').value.trim() !== model
+  )
+    return;
   if (hosted && status.oauth) {
     for (const id of ['translationConnection', 'pipelineTranslationConnection']) {
       const option = $<HTMLSelectElement>(id).querySelector<HTMLOptionElement>(
@@ -881,11 +957,9 @@ async function loadCodexStatus() {
   }
   $('codexStatus').textContent = `${status.message}${status.version ? ` (${status.version})` : ''}`;
   $<HTMLButtonElement>('startCodexTranslation').disabled = !status.available;
-  if (!$<HTMLInputElement>('codexModel').value && status.model)
-    $<HTMLInputElement>('codexModel').value = status.model;
 }
 function initializeCodexTranslations() {
-  void loadCodexStatus().catch((error) => {
+  void initializeTranslationProviders().catch((error) => {
     $('codexStatus').textContent = error.message;
   });
   $('refreshTranslationsBtn').addEventListener('click', () => {
@@ -1640,16 +1714,6 @@ function initializeWorkspace() {
       'The server uses your chosen translation account and preserves speaker turns and lyric styling.';
     $('connectionStorageTitle').textContent = 'Your keys, scoped to your account';
     $('queueControlStatus').textContent = 'Your own jobs and provider connections.';
-    const modelLabel = document.querySelector<HTMLLabelElement>('label[for=codexModel]')!;
-    modelLabel.textContent = 'Translation model';
-    $<HTMLInputElement>('codexModel').placeholder = 'gpt-5.4';
-    for (const id of ['translationConnection', 'pipelineTranslationConnection'])
-      $(id).addEventListener('change', () => {
-        const value = $<HTMLSelectElement>(id).value;
-        for (const other of ['translationConnection', 'pipelineTranslationConnection'])
-          $<HTMLSelectElement>(other).value = value;
-        void loadCodexStatus().catch((error) => notice(error.message));
-      });
     void request('/api/auth/session').then((data) => {
       $('accountIdentity').textContent = `${data.user.username} · ${data.user.email}`;
     });

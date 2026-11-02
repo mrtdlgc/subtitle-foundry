@@ -1,3 +1,4 @@
+import { translationProvider, translationProviders } from './scripts/lib/translation-providers.js';
 import express from 'express';
 import type { ErrorRequestHandler } from 'express';
 import type { Job, QueueState, Settings } from './types/pipeline.js';
@@ -678,7 +679,11 @@ async function jobInput(body: Record<string, any> = {}, deferProviders = false) 
     TRANSLATION_PROVIDER: body.translationProvider ?? config.TRANSLATION_PROVIDER,
     TRANSLATION_MODE: body.translationMode ?? config.TRANSLATION_MODE,
     TRANSLATION_SONG_REFERENCES: body.songReferences ?? '',
-    CODEX_MODEL: body.codexModel ?? config.CODEX_MODEL,
+    CODEX_MODEL:
+      body.codexModel ??
+      ((body.translationProvider ?? config.TRANSLATION_PROVIDER) === config.TRANSLATION_PROVIDER
+        ? config.CODEX_MODEL
+        : ''),
     DEMUCS_ENABLED: false,
     ALIGNMENT_METHOD: alignmentMethod,
     ALIGN_TO_SPEECH: alignmentMethod !== 'native',
@@ -715,7 +720,7 @@ async function jobInput(body: Record<string, any> = {}, deferProviders = false) 
     validateSettings(settings);
     if (
       hosted &&
-      (settings.TRANSLATION_PROVIDER === 'codex-local' ||
+      (translationProvider(settings.TRANSLATION_PROVIDER).local ||
         ['local', 'compatible', 'auto'].includes(settings.TRANSCRIBE_BACKEND))
     )
       throw new Error('Choose your own hosted provider connection');
@@ -936,14 +941,36 @@ router.post('/api/local-subtitles', async (req, res) => {
     if (!accepted) await fs.rm(directory, { recursive: true, force: true });
   }
 });
-router.get('/api/codex', async (req, res) =>
+router.get('/api/translation-providers', (_req, res) =>
   res.json({
-    ...(await codexStatus({
-      settings: { TRANSLATION_PROVIDER: String(req.query.provider || config.TRANSLATION_PROVIDER) },
-    })),
-    ...(hosted ? { oauth: chatGPTStatus() } : {}),
+    providers: translationProviders.filter((provider) =>
+      hosted ? !provider.local : provider.id !== 'chatgpt-oauth',
+    ),
+    defaultProvider: config.TRANSLATION_PROVIDER,
+    defaultModel: config.CODEX_MODEL,
   }),
 );
+router.get(['/api/codex', '/api/translation-status'], async (req, res) => {
+  const provider = String(req.query.provider || config.TRANSLATION_PROVIDER);
+  try {
+    translationProvider(provider);
+  } catch (error) {
+    fail(400, error.message);
+  }
+  const model =
+    req.query.model === undefined
+      ? provider === config.TRANSLATION_PROVIDER
+        ? config.CODEX_MODEL
+        : ''
+      : String(req.query.model);
+  const settings = { ...config, TRANSLATION_PROVIDER: provider, CODEX_MODEL: model };
+  try {
+    validateSettings(settings);
+  } catch (error) {
+    fail(400, error.message);
+  }
+  res.json({ ...(await codexStatus({ settings })), ...(hosted ? { oauth: chatGPTStatus() } : {}) });
+});
 router.get('/api/subtitle-translations', async (req, res) => {
   const files = [];
   for (const item of await fs.readdir(at('output', 'subtitles'), { withFileTypes: true })) {
@@ -961,7 +988,12 @@ router.post('/api/subtitle-translations', async (req, res) => {
   const response = await serialized('subtitle-translation-submission', async () => {
     const sourceLanguage = req.body?.sourceLanguage ?? config.DEFAULT_LANGUAGE;
     const targetLanguage = req.body?.targetLanguage ?? config.TARGET_LANGUAGE;
-    const model = req.body?.model ?? config.CODEX_MODEL;
+    const model =
+      req.body?.model ??
+      ((req.body?.translationProvider ?? config.TRANSLATION_PROVIDER) ===
+      config.TRANSLATION_PROVIDER
+        ? config.CODEX_MODEL
+        : '');
     const settings = {
       ...config,
       DEFAULT_LANGUAGE: sourceLanguage,

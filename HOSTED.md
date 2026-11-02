@@ -55,11 +55,14 @@ and IP rate limits. Set `SIGNUP_ENABLED=false` to close registrations without di
   There is no automatic switch from a subscription to API billing.
 
 Direct ElevenLabs is the default transcription provider. Other built-in cloud transcription adapters
-remain available with each user's keys. Translation offers OpenAI Responses using the user's API key
-and model selection (default `gpt-5.4`). Translation API charges are separate from ASR estimates and
-from ChatGPT subscriptions; set provider-side spending limits. Whole-file translation, validation,
-editorial cues, song handling, reusable receipts and manual corrections use the same pipeline as
-personal Codex translation.
+remain available with each user's keys. Translation offers OpenAI, Anthropic, Google Gemini, xAI
+(Grok) and OpenRouter using the user's own API keys and model selection. OpenAI defaults to
+`gpt-5.4`; the other API connections require a model ID. See
+[translation connections](TRANSLATION_PROVIDERS.md). Translation API charges are separate from ASR
+estimates and from ChatGPT subscriptions; set provider-side spending limits. Whole-file translation,
+validation, editorial cues, song handling, reusable receipts and manual corrections use the same
+pipeline as personal Codex, Claude and Grok subscription translation. Server-owner CLI logins are
+unavailable to hosted users.
 
 Local movies continue through the hybrid browser workflow: extract embedded subtitles or compact
 audio locally; transfer only required material. Playback, waveforms and optional compatible

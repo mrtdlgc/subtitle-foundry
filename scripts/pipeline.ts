@@ -1,3 +1,4 @@
+import { validateTranslationSettings, translationProvider } from './lib/translation-providers.js';
 import type { PipelineResult } from '../types/pipeline.js';
 import type { Settings, Segment, Chunk } from '../types/pipeline.js';
 import type { PipelineOptions } from '../types/pipeline.js';
@@ -58,13 +59,7 @@ export function validateSettings(settings: Settings) {
       /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(settings.TRANSLATION_SONG_REFERENCES))
   )
     throw new Error('Song reference notes must be text of at most 8,000 characters');
-  if (!['codex-local', 'openai-api', 'chatgpt-oauth'].includes(settings.TRANSLATION_PROVIDER))
-    throw new Error('Unknown translation provider');
-  if (
-    typeof settings.CODEX_MODEL !== 'string' ||
-    (settings.CODEX_MODEL && !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,99}$/.test(settings.CODEX_MODEL))
-  )
-    throw new Error('Invalid Codex model');
+  validateTranslationSettings(settings);
   for (const key of [
     'CHUNK_MIN_DURATION',
     'CHUNK_TARGET_DURATION',
@@ -399,7 +394,8 @@ async function finalize(manifest: any, srt: string, sourceLanguage: string, opti
           await options.progress(85 + pct * 0.14, message);
           await options.onStage?.({
             id: 'translation',
-            percentage: settings.TRANSLATION_PROVIDER === 'codex-local' && pct < 100 ? null : pct,
+            percentage:
+              translationProvider(settings.TRANSLATION_PROVIDER).local && pct < 100 ? null : pct,
             detail: message,
           });
         },
@@ -452,6 +448,8 @@ export async function runPipeline(job: any, options: PipelineOptions = {}) {
       ...config,
       ...job.settings,
       CODEX_BIN: config.CODEX_BIN,
+      CLAUDE_BIN: config.CLAUDE_BIN,
+      GROK_BIN: config.GROK_BIN,
       CODEX_TRANSLATION_TIMEOUT_MS: config.CODEX_TRANSLATION_TIMEOUT_MS,
       TRANSLATION_MODE: job.settings?.TRANSLATION_MODE ?? 'fixed',
     };
@@ -488,7 +486,8 @@ export async function runPipeline(job: any, options: PipelineOptions = {}) {
         await options.progress?.(pct, message);
         await options.onStage?.({
           id: 'translation',
-          percentage: settings.TRANSLATION_PROVIDER === 'codex-local' && pct < 100 ? null : pct,
+          percentage:
+            translationProvider(settings.TRANSLATION_PROVIDER).local && pct < 100 ? null : pct,
           detail: message,
         });
       },
@@ -595,6 +594,8 @@ export async function runPipeline(job: any, options: PipelineOptions = {}) {
   const settings = manifest.settings;
   const movie = fullMovie(settings);
   settings.CODEX_BIN = config.CODEX_BIN;
+  settings.CLAUDE_BIN = config.CLAUDE_BIN;
+  settings.GROK_BIN = config.GROK_BIN;
   validateSettings(settings);
   const warning = async (message: string) => {
     manifest.warnings.push(message);

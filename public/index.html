@@ -261,22 +261,20 @@
               </div>
               <label class="check-row"
                 ><input id="translateWithCodex" type="checkbox" /><span>
-                  <span id="pipelineTranslationLabel"
-                    >Translate with server Codex after transcription</span
+                  <span id="pipelineTranslationLabel">Translate after transcription</span
                   ><small id="pipelineTranslationNote">
                     Translates complete exchanges, follows speaker turns and marks uncertain lyrics
-                    for review. Uses the server owner’s Codex subscription.
+                    for review. Choose your translation connection below.
                   </small></span
                 ></label
               >
               <div id="pipelineTranslationOptions" hidden>
                 <label for="pipelineTranslationConnection">Translation connection</label
                 ><select id="pipelineTranslationConnection">
-                  <option value="openai-api">My OpenAI API key</option>
-                  <option value="chatgpt-oauth" disabled>
-                    My ChatGPT plan · awaiting activation
-                  </option>
+                  <option value="">Loading connections…</option>
                 </select>
+                <label for="pipelineTranslationModel">Translation model</label>
+                <input id="pipelineTranslationModel" maxlength="200" autocomplete="off" />
               </div>
               <label for="pipelineTranslationMode">Subtitle editing</label>
               <select id="pipelineTranslationMode">
@@ -424,18 +422,17 @@
               <h2>Translation desk</h2>
               <button id="refreshTranslationsBtn" class="btn-small">Refresh</button>
             </div>
-            <p id="codexStatus" class="provider-note" role="status">Checking server Codex…</p>
+            <p id="codexStatus" class="provider-note" role="status">
+              Checking translation connection…
+            </p>
             <p class="field-note" id="translationBillingNote">
-              Uses the ChatGPT account signed into Codex on the server. Your computer prepares media
-              and plays the film; the server handles translation.
+              Use an existing Codex, Claude or Grok subscription login, or explicitly choose an API
+              key. Translation keeps the complete subtitle context.
             </p>
             <div id="hostedTranslationOptions" hidden>
               <label for="translationConnection">Translation connection</label>
               <select id="translationConnection">
-                <option value="openai-api">My OpenAI API key</option>
-                <option value="chatgpt-oauth" disabled>
-                  My ChatGPT plan · awaiting activation
-                </option>
+                <option value="">Loading connections…</option>
               </select>
               <p class="field-note">
                 Applies to new movie jobs and subtitle translations. API translation is billed
@@ -478,11 +475,11 @@
                   ><input id="translationTargetLanguage" value="en" maxlength="3" required />
                 </div>
               </div>
-              <label for="codexModel">Codex model (optional)</label>
+              <label for="codexModel">Translation model</label>
               <input
                 id="codexModel"
                 placeholder="Use the installed Codex default"
-                maxlength="100"
+                maxlength="200"
                 autocomplete="off"
               />
               <label for="translationMode">Subtitle editing</label>

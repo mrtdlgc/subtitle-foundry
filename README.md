@@ -256,18 +256,25 @@ separate steps; a completed progress bar does not establish audio or transcript 
 
 ## Translation
 
-Open **Translations**, choose a complete SRT from the library or upload an SRT/SRT-formatted TXT,
-set the film title and languages, then click **Translate with local Codex**. Choose the uploaded
-file’s encoding explicitly: UTF-8, Windows-1254/1251/1256/1252, or UTF-16 (1 MB maximum). The
-existing transcription/audio stages are not rerun. **Studio** also has an option to translate
-automatically after transcription.
+Choose a translation connection independently of the transcription provider. **Codex, Claude Code
+and Grok Build subscription logins come first** in personal installations; Codex remains the
+default. OpenAI, Anthropic, Google Gemini, xAI (Grok) and OpenRouter API connections are explicit
+alternatives. Both Studio and the translation desk offer provider and model selection. See
+[translation connections and setup](TRANSLATION_PROVIDERS.md).
 
-This invokes the installed `codex exec` using the server user's existing **ChatGPT login**. The CLI
-runs on the server; the model runs in the cloud and uses the server owner’s Codex allowance. The app
-does not read/copy OAuth credentials, call paid OpenAI translation APIs, or fall back to API keys.
-No translation splitting is performed: each film is one task with the complete subtitle context. An
-optional model field selects a model available to your Codex account; blank uses the CLI default.
-Translation runs with high reasoning and without shell, browser, connector, or subagent tools.
+Open **Translations**, choose a complete SRT from the library or upload an SRT/SRT-formatted TXT,
+set the film title, languages and connection, then click **Translate complete subtitles**. Choose
+the uploaded file’s encoding explicitly: UTF-8, Windows-1254/1251/1256/1252, or UTF-16 (1 MB
+maximum). The existing transcription/audio stages are not rerun. **Studio** also has an option to
+translate automatically after transcription.
+
+With Codex selected, this invokes the installed `codex exec` using the server user's existing
+**ChatGPT login**. The CLI runs on the server; the model runs in the cloud and uses the server
+owner’s Codex allowance. This subscription connection does not read/copy OAuth credentials or switch
+to API-key billing. No translation splitting is performed: each film is one task with the complete
+subtitle context. An optional model field selects a model available to your Codex account; blank
+uses the CLI default. Translation runs with high reasoning and without shell, browser, connector, or
+subagent tools.
 
 Choose **Editorial** for natural translated subtitles. This is the default for new media jobs and
 library selections. Codex can regroup adjacent words from one voice into complete thoughts instead
@@ -367,7 +374,8 @@ placeholders are rejected. A merge requires every cue to have a valid translatio
 source cue IDs and timestamp strings, including CRLF/BOM input parsing. Structural validation cannot
 establish translation quality; review the result.
 
-Translation uses the Codex integration. The unused Ollama route has been removed.
+Translation uses the selected subscription or API connection. The unused Ollama route has been
+removed.
 
 The deployment defaults to cloud transcription; local transcription is optional.
 `TRANSCRIBE_BACKEND: 'local'` sends no audio to transcription providers. Legacy `auto` uses Groq

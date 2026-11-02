@@ -38,6 +38,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:3000/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/jobs)" = 401
           docker exec studio-ci node node_modules/@openai/codex/bin/codex.js --version
+          docker exec studio-ci /app/node_modules/.bin/claude --version
           docker exec studio-ci test ! -d /app/build/scripts/tests
           docker stop --time 20 studio-ci
       - name: Container logs

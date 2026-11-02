@@ -3,7 +3,7 @@ FROM node:24-bookworm-slim AS javascript
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY LICENSE ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts && node node_modules/@anthropic-ai/claude-code/install.cjs
 COPY tsconfig*.json config.ts server.ts ./
 COPY types ./types
 COPY scripts ./scripts
@@ -19,6 +19,7 @@ ENV NODE_ENV=production \
     PYTHON_BIN=/opt/audio/bin/python YTDLP_BIN=/opt/audio/bin/yt-dlp \
     PATH=/app/node_modules/.bin:/opt/audio/bin:$PATH \
     CODEX_HOME=/data/data/private/codex \
+    CLAUDE_CONFIG_DIR=/data/data/private/claude \
     TRANSCRIBE_BACKEND=elevenlabs KEEP_INTERMEDIATES=false \
     SCANNER_ENABLED=false PAUSE_ON_FAILURE=true MAX_QUEUED_JOBS=20 \
     LOCAL_WHISPER_DEVICE=cpu LOCAL_WHISPER_COMPUTE_TYPE=int8 \
@@ -31,8 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg tini util-linux ca-certificates libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 studio && useradd --uid 10001 --gid studio --create-home studio \
-    && mkdir -p /data/data/private/codex \
-    && chmod 700 /data/data/private /data/data/private/codex \
+    && mkdir -p /data/data/private/codex /data/data/private/claude \
+    && chmod 700 /data/data/private /data/data/private/codex /data/data/private/claude \
     && chown -R studio:studio /data
 WORKDIR /app
 COPY requirements*.txt ./
@@ -50,6 +51,7 @@ COPY --from=javascript /app/build ./build
 COPY --chmod=755 scripts/container-entrypoint.sh /usr/local/bin/subtitle-foundry-entrypoint
 USER 10001:10001
 RUN node node_modules/@openai/codex/bin/codex.js --version \
+    && /app/node_modules/.bin/claude --version \
     && /opt/audio/bin/yt-dlp --version
 VOLUME ["/data"]
 EXPOSE 3000

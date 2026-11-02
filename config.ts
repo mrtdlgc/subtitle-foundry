@@ -131,11 +131,16 @@ export const config = {
 
   // === Subtitle translation ===
   TRANSLATION_ENABLED: process.env.TRANSLATION_ENABLED === 'true',
-  TRANSLATION_PROVIDER: process.env.APP_MODE === 'hosted' ? 'openai-api' : 'codex-local',
+  TRANSLATION_PROVIDER:
+    process.env.TRANSLATION_PROVIDER ||
+    (process.env.APP_MODE === 'hosted' ? 'openai-api' : 'codex-local'),
   TRANSLATION_MODE: 'editorial', // New media jobs; uploaded SRT defaults to fixed timings
   TRANSLATION_SONG_REFERENCES: '', // Optional titles, performance notes or supplied lyric references
   CODEX_BIN: process.env.CODEX_BIN || 'codex',
-  CODEX_MODEL: process.env.CODEX_MODEL || (process.env.APP_MODE === 'hosted' ? 'gpt-5.4' : ''), // Empty uses the installed CLI default
+  CLAUDE_BIN: process.env.CLAUDE_BIN || 'claude',
+  GROK_BIN: process.env.GROK_BIN || 'grok',
+  CODEX_MODEL: process.env.TRANSLATION_MODEL || process.env.CODEX_MODEL || '', // Legacy setting name; empty uses the selected provider default
+  TRANSLATION_MAX_OUTPUT_TOKENS: Number(process.env.TRANSLATION_MAX_OUTPUT_TOKENS || 32768),
   CODEX_TRANSLATION_TIMEOUT_MS: Number(process.env.CODEX_TRANSLATION_TIMEOUT_MS || 30 * 60 * 1000),
   TRANSLATION_CONTEXT_WINDOW: 5, // Sentences before/after for context
   TRANSLATION_BATCH_SIZE: 10, // Sentences per LLM request

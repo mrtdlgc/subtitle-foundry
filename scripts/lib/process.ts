@@ -28,7 +28,11 @@ export function checkAbort(signal?: AbortSignal) {
 export function childEnvironment(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const env = { ...process.env, ...extra };
   for (const name of Object.keys(env))
-    if (/API_KEY|MASTER_KEY|TOKEN|PASSWORD|SECRET|YOUTUBE_COOKIES/i.test(name)) delete env[name];
+    if (/API_KEY|MASTER_KEY|TOKEN|PASSWORD|SECRET|YOUTUBE_COOKIES/i.test(name)) {
+      // This is a restrictive auth policy, not a credential. Never forward a value that releases it.
+      if (name === 'GROK_DISABLE_API_KEY_AUTH' && env[name] === '1') continue;
+      delete env[name];
+    }
   return env;
 }
 export function terminate(child?: ChildProcess | null) {

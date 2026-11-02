@@ -9,6 +9,7 @@ import { accountDatabase, onSessionRevoked, sessionValid, SESSION_MS } from './a
 export const credentialFields = [
   ['OPENROUTER_API_KEY', 'OpenRouter', true],
   ['OPENAI_API_KEY', 'OpenAI', true],
+  ['ANTHROPIC_API_KEY', 'Anthropic (API billing)', true],
   ['GROQ_API_KEY', 'Groq', true],
   ['MISTRAL_API_KEY', 'Mistral', true],
   ['DEEPGRAM_API_KEY', 'Deepgram', true],

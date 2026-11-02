@@ -10,6 +10,13 @@ import { checkAbort, run } from './process.js';
 import { parseSrt } from './srt.js';
 import { hosted } from './identity.js';
 import { responseStatus, responseTranslation } from './response-translation.js';
+import { claudeStatus, claudeTranslation } from './claude-translation.js';
+import { grokStatus, grokTranslation } from './grok-translation.js';
+import {
+  translationProvider,
+  translationModel,
+  validateTranslationSettings,
+} from './translation-providers.js';
 import { validTranslation } from '../4_chunk_srt.js';
 import { formatSubtitleDocument, netflixProfile } from './subtitle-style.js';
 import type { EditorialSource } from '../../types/editorial.js';
@@ -137,6 +144,9 @@ function runtimeArgs() {
 
 export async function codexStatus(options: PipelineOptions = {}) {
   const settings = { ...config, ...options.settings };
+  validateTranslationSettings(settings);
+  if (settings.TRANSLATION_PROVIDER === 'claude-local') return claudeStatus(settings, options);
+  if (settings.TRANSLATION_PROVIDER === 'grok-local') return grokStatus(settings, options);
   if (settings.TRANSLATION_PROVIDER !== 'codex-local') return responseStatus(settings);
   if (hosted)
     return {
@@ -290,7 +300,8 @@ export async function translateWithCodex(
   ) {
     try {
       const stat = await fs.stat(candidateFile);
-      if (stat.size > resultLimit) throw new Error('Saved Codex result exceeds its size limit');
+      if (stat.size > resultLimit)
+        throw new Error('Saved translation result exceeds its size limit');
       const saved = await fs.readFile(candidateFile, 'utf8');
       validate(saved);
       await atomicWrite(candidateFile, saved);
@@ -305,14 +316,14 @@ export async function translateWithCodex(
   let candidate: string;
   if (receipt?.completed) {
     if ((await fs.stat(candidateFile)).size > resultLimit)
-      throw new Error('Saved Codex result exceeds its size limit');
+      throw new Error('Saved translation result exceeds its size limit');
     candidate = await fs.readFile(candidateFile, 'utf8');
     if (receipt.outputHash !== hash(candidate))
-      throw new Error('Saved Codex result changed; start a new translation');
+      throw new Error('Saved translation result changed; start a new translation');
   } else {
     if (receipt && receipt.status !== 'failed' && !options.retryCodex)
       throw new Error(
-        'An earlier Codex attempt was interrupted. Retry the job explicitly to allow another subscription request.',
+        'An earlier translation attempt was interrupted. Retry the job explicitly to allow another request.',
       );
     const status = await codexStatus(options);
     if (!status.available) throw new Error(status.message);
@@ -324,7 +335,8 @@ export async function translateWithCodex(
       status: 'running',
       model:
         settings.CODEX_MODEL ||
-        (settings.TRANSLATION_PROVIDER === 'codex-local' ? 'Codex CLI default' : 'gpt-5.4'),
+        translationModel(settings) ||
+        `${translationProvider(settings.TRANSLATION_PROVIDER).name} default`,
       cliVersion: status.version,
     };
     await writeJson(receiptFile, receipt);
@@ -380,11 +392,15 @@ export async function translateWithCodex(
     }, 15000);
     try {
       if (settings.TRANSLATION_PROVIDER !== 'codex-local') {
-        const response = await responseTranslation(
-          evidence ? editorialPrompt(source, context, evidence) : codexPrompt(source, context),
-          settings,
-          options.signal,
-        );
+        const prompt = evidence
+          ? editorialPrompt(source, context, evidence)
+          : codexPrompt(source, context);
+        const response =
+          settings.TRANSLATION_PROVIDER === 'claude-local'
+            ? await claudeTranslation(prompt, settings, { ...options, workDir })
+            : settings.TRANSLATION_PROVIDER === 'grok-local'
+              ? await grokTranslation(prompt, settings, options)
+              : await responseTranslation(prompt, settings, options.signal);
         await atomicWrite(candidateFile, response.text);
         usage = response.usage;
         completed = true;
@@ -430,13 +446,13 @@ export async function translateWithCodex(
             ? 'Your translation connection needs to be renewed.'
             : 'The selected provider could not finish the complete subtitle file.';
       throw new Error(
-        `${reason} No translation was published and no paid API fallback was used. Check the selected connection, then retry manually.`,
+        `${reason} No translation was published and no provider or billing fallback was used. Check the selected connection, then retry manually.`,
       );
     } finally {
       clearInterval(heartbeat);
     }
     const stat = await fs.stat(candidateFile);
-    if (stat.size > resultLimit) throw new Error('Codex result exceeds its size limit');
+    if (stat.size > resultLimit) throw new Error('Translation result exceeds its size limit');
     candidate = await fs.readFile(candidateFile, 'utf8');
     try {
       validate(candidate);
@@ -455,7 +471,8 @@ export async function translateWithCodex(
       usage,
       model:
         settings.CODEX_MODEL ||
-        (settings.TRANSLATION_PROVIDER === 'codex-local' ? 'Codex CLI default' : 'gpt-5.4'),
+        translationModel(settings) ||
+        `${translationProvider(settings.TRANSLATION_PROVIDER).name} default`,
       cliVersion: status.version,
     };
     await writeJson(receiptFile, receipt);
@@ -476,10 +493,7 @@ export async function translateWithCodex(
   await atomicWrite(output, checked.srt);
   const report = {
     provider: settings.TRANSLATION_PROVIDER,
-    billing:
-      settings.TRANSLATION_PROVIDER === 'openai-api'
-        ? 'Your OpenAI API account'
-        : 'ChatGPT subscription allowance',
+    billing: translationProvider(settings.TRANSLATION_PROVIDER).billing,
     model: receipt.model,
     cliVersion: receipt.cliVersion,
     usage: receipt.usage,
