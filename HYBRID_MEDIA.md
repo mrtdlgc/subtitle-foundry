@@ -1,18 +1,25 @@
 # Hybrid local movies
 
-Studio's **Local file** route keeps the original movie on the user's computer. No companion app,
-local Codex installation, or local provider key is needed. Codex runs on the VPS under the server
-owner's ChatGPT login; direct ElevenLabs remains the ASR fallback.
+Studio's **Local file** route keeps the original movie on the user's computer. Preparation, playback
+and waveforms run in the browser; the app server can run locally or on a VPS. When using a remote
+server, the browser needs no companion app or local provider CLI. Configure the selected ASR and
+translation connections in the environment running the app.
 
-| Work                                        | Where it runs                         | What reaches the VPS                                                      |
-| ------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| Inspect media and select embedded subtitles | Browser                               | Filename, duration, frame rate, audio index, size and sampled fingerprint |
-| Extract text subtitles                      | Browser                               | Selected SRT, at most 1 MiB                                               |
-| Check OpenSubtitles                         | Browser computes hash; VPS searches   | A 16-character movie hash and file size                                   |
-| Prepare audio if subtitles are unavailable  | Browser                               | Continuous 16 kHz mono FLAC, including silence and delays                 |
-| Transcribe and translate                    | VPS orchestrates ElevenLabs and Codex | Audio to the configured ASR provider; subtitle context to Codex           |
-| Playback, screening conversion and waveform | Browser                               | No video, decoded PCM or waveform upload                                  |
-| Correct and export subtitles                | Browser UI and VPS                    | Cue edits, notes and playback position                                    |
+Personal installations can use Codex, Claude Code or optional Grok Build subscription logins, or an
+explicit translation API connection. Hosted accounts use their own provider connections and never
+inherit the server owner's subscription login. See
+[translation connections](TRANSLATION_PROVIDERS.md) and [hosted accounts](HOSTED.md). Direct
+ElevenLabs is the default when ASR is needed.
+
+| Work                                        | Where it runs                              | What leaves the browser or server                                              |
+| ------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------ |
+| Inspect media and select embedded subtitles | Browser                                    | Filename, duration, frame rate, audio index, size and sampled fingerprint      |
+| Extract text subtitles                      | Browser                                    | Selected SRT, at most 1 MiB                                                    |
+| Check OpenSubtitles                         | Browser computes hash; server searches     | A 16-character movie hash and file size                                        |
+| Prepare audio if subtitles are unavailable  | Browser                                    | Continuous 16 kHz mono FLAC, including silence and delays                      |
+| Transcribe and translate                    | App server orchestrates selected providers | Audio to cloud ASR when selected; subtitle context to the translation provider |
+| Playback, screening conversion and waveform | Browser                                    | No video, decoded PCM or waveform upload                                       |
+| Correct and export subtitles                | Browser UI and app server                  | Cue edits, notes and playback position                                         |
 
 Embedded tracks use the same language, forced/signs-only, SDH, completeness and timing rules as
 server-side files. Reused tracks use exact-timing translation. A target-language track skips ASR and
@@ -22,13 +29,13 @@ back to audio. No failed translation silently falls back to ASR.
 
 Hybrid audio uploads must contain exactly one 16 kHz mono FLAC stream with the movie's duration.
 Video and truncated/mismatched audio are rejected. Full-movie ElevenLabs jobs use this prepared file
-directly, without re-encoding on the VPS. Chunked ASR modes retain server-side chunking and
+directly, without re-encoding on the server. Chunked ASR modes retain server-side chunking and
 analysis. Server-resident watched files, YouTube and the existing raw-upload API retain their
 previous processing and screening paths; folder watching always refers to the server filesystem.
 
 ## Screening and corrections
 
-After generation, the VPS automatically creates the bilingual correction document without a
+After generation, the app server automatically creates the bilingual correction document without a
 screening video. **Watch & correct** opens another tab and reuses the File reference from the open
 Studio tab. Movies are never copied into IndexedDB. After closing the tabs or restarting the
 browser, choose the matching local movie again. Size and a sampled content hash catch selecting
@@ -45,7 +52,7 @@ fallback.
 Waveforms decode audio in two-minute windows into 10 ms peak/RMS bins. IndexedDB caches only the
 compact waveform, not the movie or PCM. Delayed audio, silence and chunk boundaries stay on the
 playback timeline. Corrections and revision checks remain on the server. Playback, waveform
-generation and screening preparation never rerun ASR or Codex. Existing jobs and edits are
+generation and screening preparation never rerun ASR or translation. Existing jobs and edits are
 unchanged.
 
 ## Deployment and limits
@@ -62,6 +69,12 @@ unchanged.
   Demanding files may need a locally converted browser-playable copy or a more capable computer.
 - Keep the tab open through preparation and transfer. Cancel stops the worker/transfer. If a
   transfer already completed, check the job list before submitting again.
+
+Keeping the original video local does not make the workflow offline. Selected cloud providers still
+receive audio or subtitle text. The app server stores job metadata and corrections; OpenSubtitles
+lookup sends the movie hash and size when configured. Browser waveform caches contain compact audio
+measurements, not a retained movie. Closing the browser may require selecting the matching file
+again, while saved corrections remain on the server.
 
 See the upstream
 [WORKERFS documentation](https://ffmpegwasm.netlify.app/docs/getting-started/usage/#use-workerfs).

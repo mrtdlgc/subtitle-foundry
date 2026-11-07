@@ -13,16 +13,49 @@ waveforms and previously prepared local screening copies remain readable. The ol
 folder names may stay in place; changing them is not required to use the new app.
 
 The default image targets a **CPU host with cloud transcription**. It includes Node 24, Python 3.12,
-FFmpeg, yt-dlp with its matching EJS solver, and pinned Codex CLI 0.164.0. PyTorch/Silero and
-faster-whisper are optional; Demucs is excluded. Direct ElevenLabs full-movie mode needs no local
-neural models. Faster-whisper is optional. The Python stages remain Python; the application,
+FFmpeg, yt-dlp with its matching EJS solver, and pinned Codex CLI and Claude Code. PyTorch/Silero
+and faster-whisper are optional; Demucs is excluded. Direct ElevenLabs full-movie mode needs no
+local neural models. Faster-whisper is optional. The Python stages remain Python; the application,
 browser, orchestration, adapters, workers, and CLI tools are TypeScript.
 
 GitHub Actions builds and smoke-tests the default cloud image on native ARM64 and x64 runners. The
 target host, real account login, media playback and paid providers still need acceptance. Follow the
 setup instructions below, then complete the [acceptance checklist](#manual-deployment-acceptance).
 
-## Native local Codex translation
+## Local Docker and Compose settings
+
+For a personal app on your computer, follow the
+[local Docker quick start](README.md#local-docker-quick-start). Its override publishes
+`127.0.0.1:3000:3000`; the base `compose.yaml` only exposes the container port to its Docker
+network. A VPS needs an HTTPS reverse proxy instead of an unprotected public port.
+
+Compose reads `.env` for variable substitution, but does not automatically put every entry into the
+container. The base file forwards `PUBLIC_ORIGIN`, `APP_PASSWORD`, `KEEP_INTERMEDIATES` and
+`TRANSLATION_ENABLED`. For another documented runtime variable, add it under
+`services.studio.environment` in your override. For example, if you want Claude as the default
+translation connection:
+
+```yaml
+services:
+  studio:
+    environment:
+      TRANSLATION_PROVIDER: claude-local
+    ports:
+      - '127.0.0.1:3000:3000'
+```
+
+Configure its login as described below; choosing a default does not sign the account in. Do not
+forward `.env` wholesale: its native `HOST=127.0.0.1` and empty `DATA_DIR` are inappropriate for the
+container's existing `HOST=0.0.0.0` and `/data` defaults. `.env.example` keeps intermediates for
+native review; set `KEEP_INTERMEDIATES=false` explicitly in your Compose `.env` for successful-job
+cleanup.
+
+The named volume retains data and login state across rebuilds. Keep the same Compose project name
+and volume when updating. Pause the queue and wait for active work and screenings, then run
+`git pull --ff-only` and `docker compose up -d --build`. Use `docker compose stop` / `start` for a
+normal stop/restart; `docker compose down -v` removes the persistent volume.
+
+## Personal translation connections
 
 Personal installations also support the server user's **Claude Code and Grok Build browser logins**.
 Select the subscription connection in Studio or the translation desk; API billing is an explicit
@@ -31,17 +64,20 @@ separate CLI installation in the environment running the app and `grok login --o
 [translation connections](TRANSLATION_PROVIDERS.md) for login, model selection and persistent
 storage.
 
-The **Translations** page uses an installed Codex CLI and the server OS user's existing ChatGPT
-login. It sends the complete SRT as one task, uses the subscription allowance, and never reads OAuth
-tokens or switches to paid API-key translation. Sign in with `codex login` on that machine; set
-`CODEX_BIN` to an absolute executable path for services with a restricted PATH. An optional
-`CODEX_MODEL` sets the default; the frontend can choose a model per job without a rebuild.
+With **Codex · ChatGPT subscription** selected, the **Translations** page uses the installed CLI and
+the server OS user's existing ChatGPT login. It sends the complete SRT as one task, uses the
+subscription allowance, and never reads OAuth tokens or switches to paid API-key translation. Sign
+in with `codex login` on that machine; set `CODEX_BIN` to an absolute executable path for services
+with a restricted PATH. An optional `TRANSLATION_MODEL` sets the model default (`CODEX_MODEL`
+remains a compatibility fallback); the frontend can choose a connection and model per job without a
+rebuild. Whole-file context, Exact timing/Editorial validation and saved corrections apply to all
+supported translation connections.
 
-`CODEX_TRANSLATION_TIMEOUT_MS` defaults to 1800000 (30 minutes). Job work files are under
-`DATA_DIR/temp/JOB_ID`; Codex runtime logs and SQLite state are under `DATA_DIR/data/codex-runtime`.
-Translation receipts, candidate results and source copies persist separately under
-`DATA_DIR/data/translation-receipts/JOB_ID`, including after temporary-media cleanup. Completed
-receipts from older jobs are preserved there before cleanup.
+`CODEX_TRANSLATION_TIMEOUT_MS` defaults to 1800000 (30 minutes) across translation providers. Job
+work files are under `DATA_DIR/temp/JOB_ID`; Codex runtime logs and SQLite state are under
+`DATA_DIR/data/codex-runtime`. Translation receipts, candidate results and source copies persist
+separately under `DATA_DIR/data/translation-receipts/JOB_ID`, including after temporary-media
+cleanup. Completed receipts from older jobs are preserved there before cleanup.
 
 The image includes the CLI but no account credentials. Open a terminal in the running container as
 UID 10001 and run `codex login --device-auth`, then `codex login status`. The image sets
@@ -76,9 +112,10 @@ manual checks with a real film.
    are operating limits, not measured resource requirements. The Compose example sets these limits.
 8. Deploy, open the HTTPS URL, sign in, and add keys under **Connections**. Select the saved
    provider and model in **Studio** before submitting a clip.
-9. Sign Codex in inside the container, verify a short clip, and enable watching in **Library** when
-   ready. Watching starts disabled. Enable automatic translation for scanned films with runtime
-   `TRANSLATION_ENABLED=true` after login works.
+9. Configure the selected translation connection if translation is wanted. Subscription CLI logins
+   belong inside the container; API connections use keys saved in Connections. Verify a short clip,
+   then enable watching in **Library** when ready. Watching starts disabled. Enable automatic
+   translation for scanned films with runtime `TRANSLATION_ENABLED=true` after the connection works.
 
 | Runtime variable | Value                                                                           |
 | ---------------- | ------------------------------------------------------------------------------- |
@@ -122,7 +159,8 @@ across multiple servers or replicas. Prefer the named volume to an NFS share.
 | `data/private/credentials.json`       | AES-256-GCM encrypted connection values                         |
 | `data/private/master.key`             | Encryption key; must be backed up with the vault                |
 | `data/private/codex/`                 | Container Codex login and refresh state                         |
-| `data/translation-receipts/`          | Durable Codex candidates, source copies and receipts            |
+| `data/private/claude/`                | Container Claude Code login state                               |
+| `data/translation-receipts/`          | Durable translation candidates, source copies and receipts      |
 | `data/subtitle-reviews/`              | Human corrections, paired timing, notes and generated baselines |
 | `data/job-logs/`, `data/job-archive/` | Per-job logs and explicitly archived history                    |
 | `data/subtitle-review-positions/`     | Small playback-position records                                 |
@@ -149,10 +187,11 @@ migration; their paid identities are never silently rewritten.
 
 ## Credentials and password lifecycle
 
-Connections supports all implemented transcription provider keys, a custom endpoint URL/key,
-Speechmatics region, OpenSubtitles settings, and optional YouTube cookies. Saves are encrypted and
-atomic. The next request reads the saved value; an already-started request continues with the
-credentials it captured. Saved status means a value exists, not that a provider accepted it.
+Connections supports all implemented transcription and translation API keys, a custom transcription
+endpoint URL/key, Speechmatics region, OpenSubtitles settings, a native YouTube browser-session
+selection and optional exported YouTube cookies. Secret values are encrypted and saves are atomic.
+The next request reads the saved value; an already-started request continues with the credentials it
+captured. Saved status means a value exists, not that a provider accepted it.
 
 Secret fields are blank on reload and cannot be read back through the API. A blank field does
 nothing; **Clear** removes a saved value and masks any environment fallback. New jobs use updated
@@ -245,22 +284,43 @@ neural weights. No benchmark or guaranteed RAM/throughput claim is implied by th
 | `PAUSE_ON_FAILURE`          | `true`            | Pause queue after failure until explicitly resumed    |
 
 The web upload timeout is 30 minutes. Make the reverse proxy/CDN's upload limit and timeout
-compatible with your inputs; the app cannot override an upstream 413 or connection timeout. For
-large films, placing a stable file in `/data/movies` avoids browser upload limits. Save the default
-provider's key and enable watching in Library. The scanner respects queue pause, capacity, and
-credential availability. Its enabled state persists. See
-[queue and storage controls](README.md#processing-and-review). Scans use saved server defaults,
-including `TRANSLATION_ENABLED` and `CLOUD_PRICE_PER_MINUTE`, rather than unsaved Studio form
-values. **Scan now** checks once when watching is off; enabling watching does not resume a paused
-queue.
+compatible with your inputs; the app cannot override an upstream 413 or connection timeout. The 2
+GiB upload limit is not the browser Local file selection limit: hybrid preparation keeps the
+original movie local and uploads only extracted subtitles/audio. Its prepared audio and optional
+screening outputs have a 512 MiB browser ceiling; see
+[hybrid limits](HYBRID_MEDIA.md#deployment-and-limits). For server-resident films, placing a stable
+file in `/data/movies` avoids browser transfer limits. Save the default provider's key and enable
+watching in Library. The scanner respects queue pause, capacity, and credential availability. Its
+enabled state persists. See [queue and storage controls](README.md#processing-and-review). Scans use
+saved server defaults, including `TRANSLATION_ENABLED` and `CLOUD_PRICE_PER_MINUTE`, rather than
+unsaved Studio form values. **Scan now** checks once when watching is off; enabling watching does
+not resume a paused queue.
 
 Faster-whisper is excluded from the default image and disabled in its provider selector. To include
 CPU local ASR in a future build, set Docker build argument `INSTALL_LOCAL_WHISPER=true`. The image
 installs `requirements-whisper.txt` and uses CPU/int8. This image is not a CUDA deployment recipe.
 
+For a local Compose installation, the following complete override adds both optional components:
+
+```yaml
+services:
+  studio:
+    build:
+      args:
+        INSTALL_LOCAL_WHISPER: 'true'
+        INSTALL_LOCAL_AUDIO: 'true'
+    ports:
+      - '127.0.0.1:3000:3000'
+```
+
+Merge any other settings from your existing override, then rebuild with
+`docker compose up -d --build` after active work finishes. Enable only the build arguments you need.
+Model downloads and local inference consume additional disk/CPU. Select the local provider
+explicitly for new jobs; installing it does not change saved jobs or make cloud translation offline.
+
 `compose.yaml` is an alternative single-service example. In Coolify Compose mode, assign a domain to
-`studio:3000`; standalone Compose needs your own reverse proxy on its network. It deliberately
-exposes no public host port.
+`studio:3000`; standalone VPS Compose needs your own reverse proxy on its network. It deliberately
+exposes no public host port; the local-only override above is for access on your own computer.
 
 ## Manual deployment acceptance
 
@@ -292,7 +352,9 @@ These checks are for the owner to run after deployment:
       original film offsets. Listen to speaker transitions; speaker labels are tentative voice
       groups, not identified characters.
 - [ ] Play the SRT and ASS against the original clip, checking timing at the beginning, chunk
-      boundaries and end. Translate it and confirm cue numbers and timestamps are unchanged. In
+      boundaries and end. Translate with **Exact timing** and confirm source cue IDs/order and SRT
+      timestamp strings are unchanged. Separately try **Editorial** and review the new paired cue
+      timeline, source coverage and song decisions; unchanged cue timing is not its contract. In
       [Watch & correct](SUBTITLE_REVIEW.md), edit one line and one cue time, then download both
       languages and confirm only the intended changes appear. Preserve generated originals.
 - [ ] Pause a queued clip, restart and confirm it stays queued until resumed. Test cancellation and
@@ -313,4 +375,5 @@ set.
 
 This guide describes personal workspace deployment. For a public service with email/username
 registration, private user workspaces and BYOK, use [HOSTED.md](HOSTED.md) and `APP_MODE=hosted`.
-The owner-only Codex login below is not a billing fallback for hosted users.
+The personal Codex, Claude Code and Grok Build logins described above are unavailable to hosted
+users and are never billing fallbacks for them.

@@ -81,7 +81,8 @@ provider-N.json includes raw transcript text by chunk, runtime/model information
 error metrics (if a reference was supplied), timing flags, elapsed wall time, cached-chunk count and
 usage. provider-N.srt uses the original film offsets and normal cue splitting. It intentionally does
 not apply hallucination filters or another alignment pass to the benchmark: those would obscure
-model differences. The production pipeline still performs those stages.
+model differences. Production chunked workflows can apply those stages; direct full-movie Scribe
+uses native timing without the local filter/alignment pass.
 
 results.json collects successful rows and errors. Check provider-N.error.json when a request fails.
 Reused results must not be interpreted as fresh latency measurements. The raw ASR checkpoint

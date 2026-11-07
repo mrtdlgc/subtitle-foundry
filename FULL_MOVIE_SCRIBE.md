@@ -47,10 +47,22 @@ Unusually long words and cues are flagged without silently truncating their nati
 Overlapping final cues still use the existing visible overlap-repair flags; the raw timing remains
 available for manual repair. Diarization is not forced alignment or proof of character identity.
 
-Automatic Codex translation receives the full SRT and scoped speaker annotations. Translating an
-unchanged generated source later through the translation tab also loads the matching sidecar. Its
-source hash must match; uploaded or edited subtitles do not inherit stale annotations. Translation
-still preserves every cue ID and timestamp and has no paid API fallback.
+The selected translation connection receives the full subtitle context and scoped speaker
+annotations. Translating an unchanged generated source later through the translation tab also loads
+the matching sidecar. Its source hash must match; uploaded or edited subtitles do not inherit stale
+annotations.
+
+Choose **Editorial** (the default for new media jobs and library selections) to regroup neighboring
+source anchors into natural target-language cues. This can change cue boundaries and cue count;
+paired source/target review tracks use the new timeline, and the original source SRT stays
+available. Choose **Exact timing** to preserve every source cue ID, order and timestamp string
+during translation. Uploaded SRTs default to Exact timing, and reused embedded tracks always use it.
+Manual timing edits afterward deliberately change the exported timing.
+
+Codex, Claude Code and optional Grok Build subscription connections come first on personal installs;
+translation APIs are explicit alternatives. A failed connection does not silently switch providers
+or billing. See [translation setup](TRANSLATION_PROVIDERS.md) and
+[correction workflow](SUBTITLE_REVIEW.md).
 
 ## Resources, progress and recovery
 
@@ -98,9 +110,10 @@ report flags reading rates above 20 characters/second for English or a conservat
 durations outside 5/6–7 seconds, overlaps, and text which cannot fit without editing. Other
 languages use a clearly identified generic fallback. Nothing is truncated to make it fit.
 
-The style pass does not change SRT cue IDs, timing lines or dialogue words. Codex is prompted to
-produce concise contextual translations within the same limits; exact timing validation still runs.
-Previously completed translation receipts can be reformatted without another Codex inference. Old
+The style-only pass does not change SRT cue IDs, timing lines or dialogue words. This is separate
+from Editorial translation, which can build a new cue structure. Exact-timing translation validates
+the original timing strings; editorial translation validates its source-anchor coverage and timing.
+Previously completed translation receipts can be reformatted without another model inference. Old
 completed jobs are not silently rewritten on startup.
 
 Every new export also gets an **ASS** companion: white Arial (or the player's fallback), black

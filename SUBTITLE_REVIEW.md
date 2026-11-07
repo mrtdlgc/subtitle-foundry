@@ -11,13 +11,14 @@ its original SRT (and a selection report for server-extracted tracks). Whole-fil
 is removed; use the video and waveform for any final visual timing refinements.
 
 Local Studio files now use the [hybrid workflow](HYBRID_MEDIA.md): subtitles/audio preparation,
-playback, optional screening conversion and waveforms run in the browser. The VPS runs Codex and ASR
-when needed and stores corrections. Keep Studio open to hand the selected movie to the editor; after
-closing the tabs, choose the matching file again. No screening video is uploaded.
+playback, optional screening conversion and waveforms run in the browser. The app server runs the
+selected ASR/translation connections when needed and stores corrections. Keep Studio open to hand
+the selected movie to the editor; after closing the tabs, choose the matching file again. No
+screening video is uploaded.
 
 ## Correction workflow
 
-- Press **E** or **Edit current cue** to pause on a line. Turkish/source dialogue and its
+- Press **E** or **Edit current cue** to pause on a line. Source-language dialogue and its
   translation appear together. Edit either text; corrections save automatically to the backend.
   **Ctrl/⌘+Enter** finishes saving and resumes playback.
 - Adjust start/end times, use **Start here** / **End here** at the playback position, or nudge a cue
@@ -54,8 +55,8 @@ original state also restores its original omission decision.
 
 Changing source dialogue does not run translation again: adjust the adjacent translation when its
 meaning needs changing. No edit, screening retry, media playback or subtitle export invokes ASR or
-Codex. Waveform generation also runs locally without provider requests. Native subtitle preview
-updates as you edit; downloads wait for pending saves to finish.
+translation. Waveform generation also runs locally without provider requests. Native subtitle
+preview updates as you edit; downloads wait for pending saves to finish.
 
 Corrections, notes and playback position live on the persistent server volume. A revision check
 prevents another tab from silently overwriting changes. Unsaved edits also have a browser draft;
@@ -67,21 +68,26 @@ leave-page protection. Export notes remains available as Markdown.
 ## Automatic preparation and storage
 
 `PREPARE_REVIEW=true` is the default. Hybrid jobs create the correction document automatically and
-use the browser’s local movie, with no server video preparation. The following server-media path
-applies to YouTube, raw uploads and watched films. New YouTube jobs select video up to 720p,
-preferring H.264/AAC, so transcription and screening use the same downloaded source. Compatible
-H.264 and VP8/VP9 video is remuxed without video encoding. Unsupported video gets a 480p H.264 copy
-with two CPU threads; audio is copied when compatible or encoded to AAC/Opus. Audio-only jobs get
-audio playback. The configured audio stream is used consistently. This work has its own **Prepare
-screening** bar.
+use the browser’s local movie, with no server video preparation. The browser decodes local audio in
+two-minute windows and caches compact waveform measurements in IndexedDB. It does not upload the
+movie, decoded PCM or waveform. Reopen the matching local film if the browser no longer has it.
+**Prepare local screening copy** handles incompatible codecs or a non-default soundtrack locally;
+see [hybrid screening](HYBRID_MEDIA.md#screening-and-corrections).
 
-Opening the correction editor automatically prepares a compact waveform from the screening's
-selected audio track. One low-priority audio decoder runs at a time, with a three-minute deadline;
-it streams 8 kHz PCM into 10 ms peak/RMS bins without retaining a movie-sized audio buffer or
-decoding video. Delays and silence remain on the playback timeline. The waveform is cached alongside
-the screening and reused across tabs/restarts; changed media invalidates it. A failure leaves the
-editor usable and exposes **Retry waveform**. A browser-only local film needs server screening media
-before a waveform is available.
+The following server-media path applies to YouTube, raw uploads and watched films. New YouTube jobs
+select video up to 720p, preferring H.264/AAC, so transcription and screening use the same
+downloaded source. Compatible H.264 and VP8/VP9 video is remuxed without video encoding. Unsupported
+video gets a 480p H.264 copy with two CPU threads; audio is copied when compatible or encoded to
+AAC/Opus. Audio-only jobs get audio playback. The configured audio stream is used consistently. This
+work has its own **Prepare screening** bar.
+
+For server-resident media, opening the correction editor automatically prepares a compact waveform
+from the screening's selected audio track. One low-priority audio decoder runs at a time, with a
+three-minute deadline; it streams 8 kHz PCM into 10 ms peak/RMS bins without retaining a movie-sized
+audio buffer or decoding video. Delays and silence remain on the playback timeline. The waveform is
+cached alongside the screening and reused across tabs/restarts; changed media invalidates it. A
+failure leaves the editor usable and exposes **Retry waveform**. Browser-local hybrid films use the
+local waveform path above and do not require a server screening copy.
 
 Media preparation respects the input size/duration, temporary reservation, free-space and media
 timeout limits. Persistent screening copies consume additional disk and are not removed by temp

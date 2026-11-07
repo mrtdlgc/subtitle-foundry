@@ -19,12 +19,113 @@ Source is available under **AGPL-3.0-only** in the
 [GitHub repository](https://github.com/mrtdlgc/subtitle-foundry). Runtime media, credentials and
 account state are excluded.
 
-**Hosted service:** [email/username accounts and per-user BYOK](HOSTED.md), with temporary keys by
-default and optional encrypted persistence. Each user has private jobs and corrections. OpenAI API
-translation is available; ChatGPT subscription OAuth is prepared for later activation after provider
-approval. **Personal installation:** the existing shared-password workspace and local Codex
-subscription workflow remain available. [Hybrid media preparation](HYBRID_MEDIA.md) keeps local
-films, playback and waveforms on the viewer's computer.
+**Personal installation:** a password-protected workspace with Codex, Claude Code, or optional Grok
+Build subscription translation, plus explicit API alternatives. **Hosted service:**
+[email/username accounts and per-user BYOK](HOSTED.md), with temporary keys by default and optional
+encrypted persistence. Each user has private jobs and corrections. OpenAI, Anthropic, Google Gemini,
+xAI and OpenRouter API translation are available; hosted ChatGPT subscription OAuth is prepared but
+disabled pending provider approval and configuration. Hosted users never inherit the owner's CLI
+subscription logins. [Hybrid media preparation](HYBRID_MEDIA.md) keeps local films, playback and
+waveforms on the viewer's computer.
+
+## Choose your workflow
+
+| What you have                        | Where to start                                                                         |
+| ------------------------------------ | -------------------------------------------------------------------------------------- |
+| A matching source-language SRT       | **Translations** → upload SRT → **Exact timing**. No ASR is needed.                    |
+| A film with embedded text subtitles  | **Studio → Local file** checks reusable target/source tracks before audio preparation. |
+| A film without suitable subtitles    | Configure ASR and optional translation in **Studio**, then choose the local file.      |
+| A source-language transcript to make | Leave **Translate after transcription** off, then review the source subtitles.         |
+| Completed subtitles to correct       | Open **Watch & correct**; edits and exports never call a model.                        |
+
+Set the spoken and target languages for your film; the initial form defaults are `tr` and `en`.
+Configure Studio before selecting a local file, because file selection starts preparation. Begin
+with a 30–60 second clip whose dialogue you can verify, then review a representative difficult
+passage before processing a full film.
+
+## Local Docker quick start
+
+Install Git and [Docker with Compose](https://docs.docker.com/compose/install/). These commands use
+a Linux/macOS/WSL-style shell:
+
+```bash
+git clone https://github.com/mrtdlgc/subtitle-foundry.git
+cd subtitle-foundry
+cp .env.example .env
+```
+
+Edit `.env`, replacing the password placeholder with a unique password of at least 12 characters:
+
+```dotenv
+PUBLIC_ORIGIN=http://127.0.0.1:3000
+APP_PASSWORD=replace-with-your-own-unique-password
+KEEP_INTERMEDIATES=false
+TRANSLATION_ENABLED=false
+```
+
+Create `compose.override.yaml` beside `compose.yaml` to publish the app only on your computer:
+
+```yaml
+services:
+  studio:
+    ports:
+      - '127.0.0.1:3000:3000'
+```
+
+The base Compose file exposes no host port. Start the app with the override:
+
+```bash
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 studio
+```
+
+Open **http://127.0.0.1:3000/** and sign in. Save your selected transcription provider's API key in
+**Connections** if ASR is needed. For Codex subscription translation, sign in inside the container:
+
+```bash
+docker compose exec studio codex login --device-auth
+docker compose exec studio codex login status
+```
+
+Complete the browser login yourself, refresh the app's translation status, and choose **Codex ·
+ChatGPT subscription**. A host-computer login does not automatically sign in the container. See
+[translation connections](TRANSLATION_PROVIDERS.md) for Claude Code, Grok Build and API setup.
+Enable **Translate after transcription** for the Studio jobs you want translated; the server default
+above leaves automatic translation off for scanned films.
+
+Data and provider logins persist in the `studio-data` volume mounted at `/data`. Preserve that
+volume when updating; `docker compose down -v` removes it. Pause the queue and let active work
+finish before updates or shutdown. After initialization, change the workspace password in
+**Connections**, not by editing `APP_PASSWORD`. See [deployment and backups](DEPLOYMENT.md) for
+optional local models, Compose environment forwarding and VPS operation.
+
+## Guides and support boundaries
+
+- [Transcription providers](TRANSCRIPTION_PROVIDERS.md): adapters, versioned model catalog and
+  timing capabilities. Catalog entries and fixture coverage do not establish live account access or
+  quality.
+- [Translation connections](TRANSLATION_PROVIDERS.md): subscription-first setup and explicit API
+  choices, model limits and billing behavior.
+- [Subtitle review](SUBTITLE_REVIEW.md): video/waveform editing, corrections, notes and SRT/ASS
+  export.
+- [Local media and privacy](HYBRID_MEDIA.md): what stays in the browser and what reaches providers.
+- [Provider comparison and recovery](TRANSCRIPTION_COMPARISON.md): compare retained audio samples
+  and reconcile uncertain paid requests.
+- [Deployment](DEPLOYMENT.md) and [hosted accounts](HOSTED.md): personal versus public-service
+  setup.
+
+Cloud transcription sends audio to the selected ASR provider; cloud translation sends subtitle
+context to the selected translation provider, including when its CLI runs locally. Optional local
+ASR does not make cloud translation offline. The browser Local file route keeps the original film
+local; YouTube and server-resident media follow different storage paths.
+
+The current workflow does not automatically OCR bitmap subtitles or on-screen text, denoise/isolate
+vocals, scan every video frame for scene cuts, or provide a local LLM translation connection. ASS
+export uses the app's style preset rather than preserving arbitrary source ASS typesetting. Review
+the matching film edition, linguistic accuracy and reading comfort before sharing a result; layout
+and structural checks are not a quality certification.
 
 ## Deploy on Coolify
 
@@ -41,8 +142,8 @@ available to the next request without rebuilding or restarting. The frontend, AP
 require a session. The default image uses **original audio + cloud transcription**; it includes
 FFmpeg and a YouTube downloader with Node challenge solving. PyTorch, Silero, and faster-whisper are
 optional build additions. Demucs is no longer installed or invoked. The image includes a pinned
-Codex CLI with Linux ARM64 packaging; sign in once inside the deployed container using device login.
-See the [deployment guide](DEPLOYMENT.md) for setup and recovery steps.
+Codex CLI and Claude Code; sign in inside the deployed container for the selected subscription. See
+the [deployment guide](DEPLOYMENT.md) for setup and recovery steps.
 
 Read [deployment, storage, password recovery, and the acceptance checklist](DEPLOYMENT.md) before
 your first deployment.
@@ -74,8 +175,8 @@ All inputs—audio uploads, YouTube videos, watched films, and resumed jobs—us
    flagged rather than silently truncated. Chunked jobs can also use local filtering and alignment.
 7. Export SRT, styled ASS, layout/readability reports, and speaker annotations. The default
    Netflix-inspired layout targets two lines of 42 characters; anonymous voice groups are not names.
-8. Optional Codex translation reads the complete film, then chooses meaningful target-language cues
-   from native words and scoped speaker turns. Lyrics follow the selective song policy below.
+8. Optional translation reads the complete subtitle context, then chooses meaningful target-language
+   cues from native words and scoped speaker turns. Lyrics follow the selective song policy below.
    Exact-timing mode remains available. Saved films reuse matching timing evidence without ASR;
    uploaded or modified subtitles do not inherit unverified annotations.
 
@@ -124,8 +225,8 @@ film.
 ## Local development
 
 The web application and tooling use strict TypeScript, ESM, Express, and a small browser client. The
-audio/ML stages remain Python. Use Linux (or the Docker image), Node 22.13+ (Node 24 in the image),
-Python 3.12, FFmpeg/ffprobe, and `flock` from util-linux.
+audio/ML stages remain Python. Use Linux (or the Docker image), Node >=22.13 and <27 (Node 24 in the
+image), Python 3.12, FFmpeg/ffprobe, and `flock` from util-linux.
 
 The following are setup/build commands. CI checks the production image on native x64 and ARM64
 runners; deployment-specific provider login and playback still need acceptance checks:
@@ -138,7 +239,11 @@ python3.12 -m venv .venv-audio
 ```
 
 Set a password in `.env`, plus absolute paths for `PYTHON_BIN` and `YTDLP_BIN` from your new
-environment. Keep the loopback `PUBLIC_ORIGIN` for local development. Then:
+environment. Keep the loopback `PUBLIC_ORIGIN` for local development. For subscription translation,
+use the bundled `node_modules/.bin/codex` or `node_modules/.bin/claude`, setting `CODEX_BIN` or
+`CLAUDE_BIN` to the absolute path when needed. Since this recipe skips install scripts, Claude Code
+also needs its native executable prepared as described in
+[translation setup](TRANSLATION_PROVIDERS.md). Then:
 
 ```bash
 npm run typecheck  # static checks; emits no application code
@@ -172,13 +277,13 @@ wrappers are retained in Git history, not shipped in the image.
 Choose a **Local file** in Studio, submit a YouTube video, or put films in the server’s persistent
 `movies/` directory (`/data/movies` in Docker). Local files use the
 [hybrid workflow](HYBRID_MEDIA.md): the browser extracts subtitles or compact audio, plays the movie
-and draws its waveform. The movie stays on that computer; Codex translation runs on the server.
-Enable server-folder watching in **Library** after saving the provider key. The scanner observes
-files twice and waits for stability; it fills at most 20 waiting slots and checks the remaining
-films on later scans. **Pause queue** lets the current job finish and prevents the next one from
-starting. Failures and interrupted restarts pause the queue for inspection. Failed, interrupted and
-paused jobs remain visible; use Retry/Resume instead of creating duplicate jobs. A scanner reset
-allows a finished film to be submitted again.
+and draws its waveform. The movie stays on that computer; the server runs the selected translation
+connection and stores corrections. Enable server-folder watching in **Library** after saving the
+provider key. The scanner observes files twice and waits for stability; it fills at most 20 waiting
+slots and checks the remaining films on later scans. **Pause queue** lets the current job finish and
+prevents the next one from starting. Failures and interrupted restarts pause the queue for
+inspection. Failed, interrupted and paused jobs remain visible; use Retry/Resume instead of creating
+duplicate jobs. A scanner reset allows a finished film to be submitted again.
 
 Docker removes temporary media only after successful completion by default. Turn on **Keep temporary
 audio after success** for comparison work. Subtitles, raw ASR checkpoints, translation receipts and
@@ -277,12 +382,13 @@ uses the CLI default. Translation runs with high reasoning and without shell, br
 subagent tools.
 
 Choose **Editorial** for natural translated subtitles. This is the default for new media jobs and
-library selections. Codex can regroup adjacent words from one voice into complete thoughts instead
-of inheriting every punctuation cut. Two-speaker captions require distinct scoped voices and one
-short complete sentence per line; the app supplies their dashes. Every original anchor must be
-accounted for exactly once. Missing, repeated, reordered, invented or mixed-speaker ranges are
-rejected. An SRT without native words remains cue-granular; estimated timings never become word
-evidence. Older source reports can supply native words when their exported SRT still matches.
+library selections. The translation model can regroup adjacent words from one voice into complete
+thoughts instead of inheriting every punctuation cut. Two-speaker captions require distinct scoped
+voices and one short complete sentence per line; the app supplies their dashes. Every original
+anchor must be accounted for exactly once. Missing, repeated, reordered, invented or mixed-speaker
+ranges are rejected. An SRT without native words remains cue-granular; estimated timings never
+become word evidence. Older source reports can supply native words when their exported SRT still
+matches.
 
 Choose **Exact timing** when synchronization must stay identical. Uploaded subtitles and API calls
 without a mode default to this option. Cue IDs, order and timing lines are checked and copied
@@ -300,8 +406,8 @@ extracted subtitle. Server-extracted tracks also have a selection report. Transl
 the saved, hash-checked track and never pay for ASR just because translation failed. Existing
 completed jobs and edits are unchanged. The browser checks embedded and hash-matched online
 subtitles before preparing audio locally. Server-side uploads inspect subtitles before requiring ASR
-credentials; provider readiness is checked before server audio preparation. Codex login is needed
-only when a translation is actually performed on the reused track.
+credentials; provider readiness is checked before server audio preparation. A translation connection
+is needed only when a translation is actually performed on the reused track.
 
 Editorial mode translates story-relevant songs in italics and allows incidental background lyrics to
 be omitted with a recorded reason. Omitted lyrics and their translation remain in the correction
@@ -313,10 +419,10 @@ passages stay present and are flagged for listening. No additional paid audio cl
 
 Both prompts include a **known-song rule**. Optional song notes can contain titles, performance
 details or supplied reference lyrics. Remembered lyrics are hypotheses, not proof of what this
-performance sang. Codex must not fill missing verses from memory or claim online verification; web
-access is disabled. Editorial source repairs are recorded as review notes while the original
-transcript stays unchanged. Recognized songs still require listening where attribution or wording is
-uncertain.
+performance sang. The translation model must not fill missing verses from memory or claim online
+verification; web access is disabled. Editorial source repairs are recorded as review notes while
+the original transcript stays unchanged. Recognized songs still require listening where attribution
+or wording is uncertain.
 
 The final renderer uses source-word bounds, natural line wrapping, duration and reading-speed
 checks. It allows up to half a second of trailing display time where space permits. Whole-film
@@ -330,22 +436,22 @@ be made against the video and waveform in the correction editor.
 The translation report includes token usage, source-anchor ranges, song decisions, proposed source
 repairs and readability notes. Paired review files follow the new cue boundaries; original source
 downloads and existing human corrections remain separate. Existing manifests retain their prior mode
-and audio-event request identity. Completed Codex receipts remain reusable across prompt updates;
-applying new instructions to completed work requires a new translation job.
+and audio-event request identity. Completed matching translation receipts remain reusable across
+prompt updates; applying new instructions to completed work requires a new translation job.
 
 Pauses within a phrase and overlong source intervals produce review warnings instead of rejecting
 the whole film. Native timing is retained for listening and correction; target words are never split
 mechanically or clipped to force a duration. Missing content and speaker-boundary violations still
 block publication. A completed model result rejected by local validation is retained and can be
-revalidated after a validator fix, without another Codex request. Failed model execution is tracked
-separately and is not treated as a locally rejected success.
+revalidated after a validator fix, without another translation request. Failed model execution is
+tracked separately and is not treated as a locally rejected success.
 
 Results appear in the job queue with cancellation and explicit retry. These checks establish
 structural integrity, not linguistic accuracy or Netflix delivery certification. Review a real film
 before release; the fixture suite does not evaluate live model translation quality. Partial/failed
-Codex responses are never published. There is no automatic retry that silently spends more plan
-allowance. A verified result is reusable after interruption; an incomplete task starts over when you
-explicitly retry.
+translation responses are never published. There is no automatic retry that silently spends more
+plan allowance or API usage. A verified result is reusable after interruption; an incomplete task
+starts over when you explicitly retry.
 
 The editorial targets follow Netflix's
 [English timed-text guide](https://partnerhelp.netflixstudios.com/hc/en-us/articles/217350977-English-USA-Timed-Text-Style-Guide),
