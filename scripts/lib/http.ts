@@ -1,13 +1,37 @@
+import { Agent } from 'undici';
+
+// The request's AbortSignal owns the whole deadline, including response reads.
+// Undici's separate five-minute parser timers must not shorten movie requests.
+const requestDispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
 export async function fetchLimited(
+  url: string,
+  options: RequestInit & { timeout?: number; maxBytes?: number } = {},
+) {
+  try {
+    return await requestLimited(url, options);
+  } catch (error) {
+    const code = error instanceof Error ? (error.cause as { code?: unknown })?.code : undefined;
+    // Preserve a useful transport diagnosis without logging URLs or credentials.
+    if (error instanceof Error && typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,79}$/.test(code))
+      error.message = `${error.message} (${code})`;
+    throw error;
+  }
+}
+
+async function requestLimited(
   url: string,
   options: RequestInit & { timeout?: number; maxBytes?: number } = {},
 ) {
   const { signal, timeout = 30000, maxBytes = 8 * 1024 * 1024, ...init } = options;
   const deadline = AbortSignal.timeout(timeout);
-  const response = await fetch(url, {
+  const requestOptions = {
     ...init,
+    dispatcher: requestDispatcher,
     signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
-  });
+  };
+  // Node's ambient dispatcher types can be newer than its bundled runtime.
+  const response = await fetch(url, requestOptions as unknown as RequestInit);
   if (!response.ok) {
     let detail = '';
     const errorReader = response.body?.getReader();
@@ -25,8 +49,16 @@ export async function fetchLimited(
         const message =
           body.error?.message ??
           body.message ??
-          (typeof body.error === 'string' ? body.error : null);
-        if (typeof message === 'string') detail = message;
+          (typeof body.error === 'string' ? body.error : null) ??
+          body.detail?.message ??
+          (typeof body.detail === 'string' ? body.detail : null);
+        if (typeof message === 'string') {
+          const code = body.detail?.status;
+          detail =
+            typeof code === 'string' && /^[a-z][a-z0-9_]{1,79}$/i.test(code)
+              ? `${code}: ${message}`
+              : message;
+        }
       } catch {
         /* Non-JSON/oversized error bodies are not exposed. */
       } finally {
