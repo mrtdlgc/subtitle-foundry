@@ -188,7 +188,7 @@ function showProviderDetails(reset = false) {
     p.models.find((m) => m.id === $<HTMLInputElement>('transcriptionModel').value) ??
     p.models.find((m) => m.id === p.defaultModel);
   const mode = $<HTMLSelectElement>('transcriptionMode');
-  const direct = p.id === 'elevenlabs' && m?.id === 'scribe_v2';
+  const direct = p.id === 'elevenlabs' && ['scribe_v3', 'scribe_v2'].includes(m?.id ?? '');
   const scribe = direct || (p.id === 'openrouter' && m?.id === 'elevenlabs/scribe-v2');
   const movieOption = mode.querySelector<HTMLOptionElement>('option[value="movie"]')!;
   movieOption.disabled = !direct;

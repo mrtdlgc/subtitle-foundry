@@ -257,7 +257,7 @@ and changing a paused pre-ASR job. File preparation uses bounded FFmpeg threads 
 from disk. This removes the local neural-model requirement; CI validates image startup on both
 architectures; resource use on the target host remains a deployment check.
 
-The default is **direct ElevenLabs Scribe v2 on original audio**. Demucs is neither installed nor
+The default is **direct ElevenLabs Scribe v3 on original audio**. Demucs is neither installed nor
 invoked. Automatic/Full movie streams one file and preserves native word timing. Chunked mode
 retains energy alignment and optional Silero checks. Add Silero with Docker build argument
 `INSTALL_LOCAL_AUDIO=true`; the default image has `LOCAL_AUDIO_ENABLED=false`. API credentials go in
@@ -271,7 +271,7 @@ neural weights. No benchmark or guaranteed RAM/throughput claim is implied by th
 | Runtime variable            | Default           | Purpose                                               |
 | --------------------------- | ----------------- | ----------------------------------------------------- |
 | `TRANSCRIBE_BACKEND`        | `elevenlabs`      | Default for new/scanned jobs                          |
-| `TRANSCRIPTION_MODEL`       | empty             | Direct ElevenLabs defaults to `scribe_v2`             |
+| `TRANSCRIPTION_MODEL`       | empty             | Direct ElevenLabs defaults to `scribe_v3`             |
 | `LOCAL_WHISPER_CPU_THREADS` | `2`               | Worker/PyTorch thread limit                           |
 | `WORKER_START_TIMEOUT_MS`   | `300000`          | Local Whisper startup, including first model download |
 | `MEDIA_TIMEOUT_MS`          | `3600000`         | Deadline for a media process                          |

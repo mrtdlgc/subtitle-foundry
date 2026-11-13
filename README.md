@@ -12,7 +12,7 @@ completed provider requests.
 
 Local media preparation, optional speech detection, speaker-aware cues, translation, and manual
 review are distinct parts of the pipeline. Choose the applicable stages and providers through the
-studio and configuration. The default transcription route uses **direct ElevenLabs Scribe v2**;
+studio and configuration. The default transcription route uses **direct ElevenLabs Scribe v3**;
 other cloud providers and optional local ASR remain available.
 
 Source is available under **AGPL-3.0-only** in the
@@ -184,12 +184,13 @@ Your spectral classifier remains in `scripts/workers/audio_analysis_worker.ts`, 
 diagnostic. `scripts/test_speech_detection.ts` is a separate diagnostic; the live chunker does not
 claim to run that classifier.
 
-The default is **direct `elevenlabs` / `scribe_v2`, one continuous movie**. OpenRouter and other
-adapters remain available. Optional local ASR still uses **large-v3**. Local `WORD_TIMESTAMPS` stays
-false by default; cloud adapters request supported native timestamps. Text-only models get
-explicitly flagged estimates distributed over cached speech intervals. Neither pyannote nor WhisperX
-is required. Speech-activity alignment is not word-level forced alignment, and accuracy on a
-particular film still needs listening checks.
+The default is **direct `elevenlabs` / `scribe_v3`, one continuous movie**. Scribe v2 remains
+available for existing jobs and explicit selection. OpenRouter and other adapters remain available.
+Optional local ASR still uses **large-v3**. Local `WORD_TIMESTAMPS` stays false by default; cloud
+adapters request supported native timestamps. Text-only models get explicitly flagged estimates
+distributed over cached speech intervals. Neither pyannote nor WhisperX is required. Speech-activity
+alignment is not word-level forced alignment, and accuracy on a particular film still needs
+listening checks.
 
 ## Cloud transcription and subscriptions
 

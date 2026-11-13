@@ -4,7 +4,7 @@ import { DEFAULT_OPENROUTER_MODEL } from '../../config.js';
 import { hosted } from '../lib/identity.js';
 import { credential } from '../lib/credentials.js';
 import { readFileSync } from 'node:fs';
-import { fullMovie } from '../lib/transcription-mode.js';
+import { fullMovie, isDirectScribe } from '../lib/transcription-mode.js';
 import '../lib/environment.js';
 
 export const PRICING_DATE = '2026-10-23';
@@ -130,13 +130,16 @@ export const providers: Provider[] = [
     id: 'elevenlabs',
     name: 'ElevenLabs',
     key: 'ELEVENLABS_API_KEY',
-    defaultModel: 'scribe_v2',
+    defaultModel: 'scribe_v3',
     billing:
       'Direct ElevenAPI: pay-as-you-go or included plan usage; subscription fees and overage are separate',
     source: 'https://elevenlabs.io/pricing/api',
     models: [
-      model('scribe_v2', 0.22 / 60, 'word', {
-        note: 'Published API rate: $0.22/hour. Your account’s credit conversion, subscription and overage can differ; use a custom price for your plan. Supports full-movie transcription and speaker labels.',
+      model('scribe_v3', 0.2 / 60, 'word', {
+        note: 'Default recorded-audio model. Published API rate checked 2026-11-13: $0.20/hour. Your account’s subscription and overage can differ; use a custom price for your plan. Supports full-movie transcription and speaker labels.',
+      }),
+      model('scribe_v2', 0.2 / 60, 'word', {
+        note: 'Previous model, retained for existing jobs and explicit selection. Published API rate checked 2026-11-13: $0.20/hour. Supports full-movie transcription and speaker labels.',
       }),
     ],
   },
@@ -332,10 +335,10 @@ export function validateProviderSettings(settings: Settings) {
   if (
     fullMovie(settings) &&
     (settings.TRANSCRIBE_BACKEND !== 'elevenlabs' ||
-      !['', 'scribe_v2'].includes(settings.TRANSCRIPTION_MODEL))
+      (settings.TRANSCRIPTION_MODEL && !isDirectScribe(settings.TRANSCRIPTION_MODEL)))
   )
     throw new Error(
-      'Full-movie transcription requires direct ElevenLabs / Scribe v2; OpenRouter remains available for chunks',
+      'Full-movie transcription requires direct ElevenLabs / Scribe v3 or v2; OpenRouter remains available for chunks',
     );
   for (const key of ['MOVIE_TRANSCRIPTION_TIMEOUT_MS', 'MAX_MOVIE_AUDIO_BYTES'] as const)
     if (!Number.isSafeInteger(settings[key]) || settings[key] <= 0)

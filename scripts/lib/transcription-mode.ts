@@ -1,5 +1,9 @@
 import type { Settings } from '../../types/pipeline.js';
 
+export function isDirectScribe(model: string): boolean {
+  return ['scribe_v3', 'scribe_v2'].includes(model);
+}
+
 export function fullMovie(settings: Partial<Settings>): boolean {
   return (
     settings.TRANSCRIPTION_MODE === 'movie' ||
@@ -11,7 +15,7 @@ export function scribeDiarization(settings: Partial<Settings>): boolean {
   return Boolean(
     settings.TRANSCRIPTION_DIARIZATION &&
     ((settings.TRANSCRIBE_BACKEND === 'elevenlabs' &&
-      (!settings.TRANSCRIPTION_MODEL || settings.TRANSCRIPTION_MODEL === 'scribe_v2')) ||
+      (!settings.TRANSCRIPTION_MODEL || isDirectScribe(settings.TRANSCRIPTION_MODEL))) ||
       (settings.TRANSCRIBE_BACKEND === 'openrouter' &&
         (!settings.TRANSCRIPTION_MODEL ||
           settings.TRANSCRIPTION_MODEL === 'elevenlabs/scribe-v2'))),

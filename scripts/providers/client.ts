@@ -12,7 +12,12 @@ import { readJson, writeJson } from '../lib/files.js';
 import { estimate, selection } from './catalog.js';
 import { adapters } from './adapters.js';
 import { normalize } from './normalize.js';
-import { fullMovie, scribeDiarization, scribeAudioEvents } from '../lib/transcription-mode.js';
+import {
+  fullMovie,
+  isDirectScribe,
+  scribeDiarization,
+  scribeAudioEvents,
+} from '../lib/transcription-mode.js';
 
 export function cloudPlan(chunks: any, settings: Settings, language = settings.DEFAULT_LANGUAGE) {
   const selected = selection(settings, language);
@@ -144,8 +149,8 @@ async function transcribeLocked(
   const endpoint = await credential('TRANSCRIPTION_API_URL');
   const region = (await credential('SPEECHMATICS_REGION')) || 'eu1';
   const movie = fullMovie(settings);
-  if (movie && (selected.provider.id !== 'elevenlabs' || selected.model.id !== 'scribe_v2'))
-    throw new Error('Full-movie uploads require direct ElevenLabs / Scribe v2');
+  if (movie && (selected.provider.id !== 'elevenlabs' || !isDirectScribe(selected.model.id)))
+    throw new Error('Full-movie uploads require direct ElevenLabs / Scribe v3 or v2');
   const stat = await fs.stat(chunk.file);
   const limit = movie ? settings.MAX_MOVIE_AUDIO_BYTES : 20 * 1024 * 1024;
   if (!stat.isFile() || !stat.size || stat.size > limit)

@@ -27,9 +27,9 @@ node build/scripts/compare-transcribers.js --job JOB_ID --chunks 1,7,19 --name f
 
 Replace IDs with real IDs in your manifest. Omit --chunks to select the first three retained chunks.
 Default choices are in transcription-matrix.example.json: Groq large-v3 baseline, Voxtral Mini 3,
-GPT Transcribe, Scribe v2, Grok Voice Transcribe 2.0, Gemini 3.5 Transcribe and OpenRouter Voxtral
-Small 3. Copy/edit the matrix and pass --matrix my-matrix.json to choose fewer/different models. Use
-provider names from [TRANSCRIPTION_PROVIDERS.md](TRANSCRIPTION_PROVIDERS.md).
+GPT Transcribe, Scribe v3/v2, Grok Voice Transcribe 2.0, Gemini 3.5 Transcribe and OpenRouter
+Voxtral Small 3. Copy/edit the matrix and pass --matrix my-matrix.json to choose fewer/different
+models. Use provider names from [TRANSCRIPTION_PROVIDERS.md](TRANSCRIPTION_PROVIDERS.md).
 
 output/comparisons/first-pass/ contains plan.json, reference.template.json and manual.template.json.
 The plan includes exact prepared audio paths, original film offsets, each provider's gross price

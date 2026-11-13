@@ -4,7 +4,7 @@ import type { Interval } from '../lib/audio.js';
 import type { Settings } from '../../types/pipeline.js';
 import { readJson } from '../lib/files.js';
 import { intervalsFromProfile } from '../lib/audio.js';
-import { fullMovie, scribeDiarization } from '../lib/transcription-mode.js';
+import { fullMovie, isDirectScribe, scribeDiarization } from '../lib/transcription-mode.js';
 
 const join = (words: any) =>
   words
@@ -114,7 +114,7 @@ export async function normalize(
 ): Promise<NormalizedTranscript> {
   const duration = chunk.endTime - chunk.startTime;
   const scribe =
-    (selected.model.id === 'scribe_v2' && selected.provider.id === 'elevenlabs') ||
+    (isDirectScribe(selected.model.id) && selected.provider.id === 'elevenlabs') ||
     (selected.model.id === 'elevenlabs/scribe-v2' && selected.provider.id === 'openrouter');
   if (typeof result.text !== 'string')
     throw new Error('Provider returned no transcript text; retained response needs inspection');

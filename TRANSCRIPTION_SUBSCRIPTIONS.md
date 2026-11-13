@@ -1,12 +1,12 @@
-# Subscriptions and transcription — checked 2026-10-23
+# Subscriptions and transcription — checked 2026-10-23; ElevenLabs updated 2026-11-13
 
 The useful distinction is whether a subscription funds the documented API used by this pipeline. A
 web-app upload allowance alone is not an API credential.
 
 ## ElevenLabs: direct API with pay-as-you-go or a plan
 
-The official API pricing page lists Scribe v2 at USD 0.22 per audio hour and offers both
-pay-as-you-go and subscription billing. That is approximately USD 0.33 for 90 minutes or USD 0.44
+The official API pricing page lists Scribe v3 and v2 at USD 0.20 per audio hour and offers both
+pay-as-you-go and subscription billing. That is approximately USD 0.30 for 90 minutes or USD 0.40
 for two hours, before taxes, plan fees and optional features. Included usage and the account's
 remaining balance must be checked in the ElevenLabs dashboard; the app does not assume unlimited or
 free API use.

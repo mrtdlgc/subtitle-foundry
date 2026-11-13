@@ -9,8 +9,10 @@ process.env.DATA_DIR = root;
 process.env.ELEVENLABS_API_KEY = 'test-only-fixture';
 after(() => fs.rm(root, { recursive: true, force: true }));
 const { config } = await import('../../config.js');
-const { fullMovie, movieSettings } = await import('../lib/transcription-mode.js');
-const { selection, estimate, validateProviderSettings } = await import('../providers/catalog.js');
+const { fullMovie, movieSettings, scribeDiarization, scribeAudioEvents } =
+  await import('../lib/transcription-mode.js');
+const { selection, estimate, publicCatalog, validateProviderSettings } =
+  await import('../providers/catalog.js');
 const { normalize } = await import('../providers/normalize.js');
 const { mergeSegments } = await import('../3.2_merge_sentences.js');
 const { cleanSegments } = await import('../3.7_clean_srt.js');
@@ -24,7 +26,7 @@ const { codexPrompt } = await import('../lib/codex-translation.js');
 const settings = movieSettings({
   ...config,
   TRANSCRIBE_BACKEND: 'elevenlabs',
-  TRANSCRIPTION_MODEL: 'scribe_v2',
+  TRANSCRIPTION_MODEL: 'scribe_v3',
   TRANSCRIPTION_MODE: 'movie',
   TRANSCRIPTION_DIARIZATION: true,
   LOCAL_AUDIO_ENABLED: false,
@@ -58,6 +60,27 @@ async function wav(file: string) {
   await fs.writeFile(file, b);
 }
 
+test('direct ElevenLabs defaults to v3 and keeps v2 available with full-film capabilities', async () => {
+  const defaults = { ...settings, TRANSCRIPTION_MODEL: '', TRANSCRIPTION_MODE: 'auto' };
+  const catalog = await publicCatalog(defaults);
+  assert.equal(catalog.defaultModel, 'scribe_v3');
+  assert.equal(catalog.providers.find((p) => p.id === 'elevenlabs')?.defaultModel, 'scribe_v3');
+  for (const model of ['', 'scribe_v3', 'scribe_v2']) {
+    const candidate = { ...defaults, TRANSCRIPTION_MODEL: model };
+    validateProviderSettings(candidate);
+    assert.equal(selection(candidate).model.id, model || 'scribe_v3');
+    assert.equal(fullMovie(candidate), true);
+    assert.equal(scribeDiarization(candidate), true);
+    assert.equal(scribeAudioEvents(candidate), true);
+    assert.equal(scribeDiarization({ ...candidate, TRANSCRIPTION_DIARIZATION: false }), false);
+    assert.equal(scribeAudioEvents({ ...candidate, TRANSCRIPTION_AUDIO_EVENTS: false }), false);
+  }
+  assert.throws(
+    () => validateProviderSettings({ ...defaults, TRANSCRIPTION_MODEL: 'scribe_v3_live' }),
+    /requires direct ElevenLabs/,
+  );
+});
+
 test('full-film mode is explicit for ElevenLabs; estimates retain real audio duration', () => {
   assert.equal(fullMovie({ ...settings, TRANSCRIPTION_MODE: 'auto' }), true);
   assert.equal(fullMovie({ ...settings, TRANSCRIPTION_MODE: 'chunks' }), false);
@@ -72,8 +95,7 @@ test('full-film mode is explicit for ElevenLabs; estimates retain real audio dur
     /requires direct ElevenLabs/,
   );
   assert.ok(
-    Math.abs(estimate([{ startTime: 0, endTime: 5400 }], selection(settings)).amount! - 0.33) <
-      1e-9,
+    Math.abs(estimate([{ startTime: 0, endTime: 5400 }], selection(settings)).amount! - 0.3) < 1e-9,
   );
   const stages = createStages({ type: 'audio', settings });
   assert.equal(stages.find((s) => s.id === 'vad')?.status, 'skipped');
@@ -152,7 +174,7 @@ test('full-movie multipart uses a file-backed Blob above the chunk cap and cache
     assert.equal(String(url), 'https://api.elevenlabs.io/v1/speech-to-text');
     calls++;
     const body = init?.body as FormData;
-    assert.equal(body.get('model_id'), 'scribe_v2');
+    assert.equal(body.get('model_id'), 'scribe_v3');
     assert.equal(body.get('diarize'), 'true');
     assert.equal(body.get('tag_audio_events'), 'true');
     const blob = body.get('file') as Blob;
@@ -180,6 +202,16 @@ test('full-movie multipart uses a file-backed Blob above the chunk cap and cache
         chunk,
         'tr',
         null,
+        { ...settings, TRANSCRIPTION_MODEL: 'scribe_v2' },
+        options,
+      ),
+      /checkpoint does not match/,
+    );
+    await assert.rejects(
+      transcribeCloud(
+        chunk,
+        'tr',
+        null,
         { ...settings, TRANSCRIPTION_AUDIO_EVENTS: false },
         options,
       ),
@@ -198,6 +230,40 @@ test('full-movie multipart uses a file-backed Blob above the chunk cap and cache
     await assert.rejects(
       transcribeCloud(chunk, 'tr', null, { ...settings, TRANSCRIPTION_MODE: 'chunks' }, options),
       /20 MiB/,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test('saved v2 full-movie requests remain reusable without switching models or resubmitting', async () => {
+  const legacy = { ...settings, TRANSCRIPTION_MODEL: 'scribe_v2' };
+  const file = path.join(root, 'legacy-v2.wav');
+  await wav(file);
+  const chunk = { id: 0, file, startTime: 0, endTime: 1 };
+  const options = {
+    rawDir: path.join(root, 'legacy-v2-requests'),
+    signature: 'legacy-v2',
+    plan: cloudPlan([chunk], legacy),
+  };
+  const previous = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    const body = init?.body as FormData;
+    assert.equal(body.get('model_id'), 'scribe_v2');
+    assert.equal(body.get('diarize'), 'true');
+    return Response.json(response);
+  };
+  try {
+    const first = await transcribeCloud(chunk, 'tr', null, legacy, options);
+    assert.equal(first.segments[0].speaker, 'speaker_0');
+    const cached = await transcribeCloud(chunk, 'tr', null, legacy, options);
+    assert.equal(cached._runtime.cached, true);
+    await assert.rejects(
+      transcribeCloud(chunk, 'tr', null, settings, options),
+      /checkpoint does not match/,
     );
     assert.equal(calls, 1);
   } finally {

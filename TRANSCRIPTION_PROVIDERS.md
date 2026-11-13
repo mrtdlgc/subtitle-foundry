@@ -1,15 +1,21 @@
-# Transcription providers — catalog 2026-10-23; ElevenLabs full-movie path updated 2026-10-24
+# Transcription providers — catalog 2026-10-23; direct ElevenLabs updated 2026-11-13
 
-The current default is **direct ElevenLabs / `scribe_v2`**, using one continuous original-audio
+The current default is **direct ElevenLabs / `scribe_v3`**, using one continuous original-audio
 file. OpenRouter, lossless chunking, optional Silero profiling, film offsets, hallucination review,
 alignment and translation remain selectable; Demucs is no longer run or installed in the default
 image. Check account compatibility and transcription quality on representative samples using
 [TRANSCRIPTION_COMPARISON.md](TRANSCRIPTION_COMPARISON.md).
 
-Direct **ElevenLabs / `scribe_v2`** now defaults to full-movie submission; explicit Short chunks
-remains available. It streams file-backed multipart data, enables diarization, and builds cues from
-native words. OpenRouter Scribe also supports speaker labels but stays chunked.
+Direct **ElevenLabs / `scribe_v3`** defaults to full-movie submission; explicit Short chunks remains
+available. It streams file-backed multipart data, enables diarization, and builds cues from native
+words. OpenRouter Scribe also supports speaker labels but stays chunked.
 [Full-movie setup and limits](FULL_MOVIE_SCRIBE.md).
+
+Direct Scribe v3 and its USD 0.20/hour base rate were verified on 2026-11-13 against the
+[official model documentation](https://elevenlabs.io/docs/overview/models#scribe-v3) and
+[API pricing](https://elevenlabs.io/pricing/api). Scribe v2 remains available for existing jobs and
+explicit selection through the same API, also at USD 0.20/hour. Other provider entries retain the
+catalog snapshot date below; OpenRouter's default remains `elevenlabs/scribe-v2`.
 
 Choose a provider/model in **Studio**. Save API keys in **Connections**; updates apply to future
 requests without a restart or build. Secret values are encrypted on the backend and are never read
@@ -35,7 +41,7 @@ Catalog snapshot: 2026-10-23. The UI warns when it is more than 30 days old.
 | `mistral`      | `voxtral-mini-transcribe-3-0` | Chunks; segment timing                                |
 | `deepgram`     | `nova-3`                      | Chunks; word timing                                   |
 | `assemblyai`   | `universal-2`                 | Chunks; word timing                                   |
-| `elevenlabs`   | `scribe_v2`                   | Full movie or chunks; native word timing and speakers |
+| `elevenlabs`   | `scribe_v3`                   | Full movie or chunks; native word timing and speakers |
 | `gemini`       | `gemini-3.5-transcribe`       | Chunks; word timing                                   |
 | `xai`          | `grok-voice-transcribe-2.0`   | Chunks; word timing                                   |
 | `speechmatics` | `enhanced`                    | Chunks; word timing                                   |
@@ -65,7 +71,7 @@ unsupported verbose_json fields speculatively.
 | Deepgram Nova-3              | USD 0.258 pinned language; USD 0.312 multilingual  |
 | AssemblyAI Universal-2       | USD 0.150, per-second billing                      |
 | AssemblyAI Universal-3.5 Pro | USD 0.210, per-second billing                      |
-| ElevenLabs Scribe v2         | USD 0.220 published API audio-hour rate            |
+| ElevenLabs Scribe v3 / v2    | USD 0.200 published direct API audio-hour rate     |
 | Gemini 3.5 Transcribe        | approx. USD 0.306; actual input/output tokens vary |
 | Grok Voice Transcribe 2.0    | USD 0.100 for REST, not the streaming price        |
 | Speechmatics Enhanced        | USD 0.380; Standard 0.230; Melia 1 0.120           |

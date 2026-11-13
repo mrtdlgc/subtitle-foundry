@@ -3,12 +3,16 @@
 ## Use it
 
 1. Save your **ElevenLabs API key** in Connections. Key changes need no rebuild or restart.
-2. In Studio, choose **ElevenLabs**, model **scribe_v2**, and **Automatic** or **Full movie**.
+2. In Studio, choose **ElevenLabs**, model **scribe_v3**, and **Automatic** or **Full movie**.
 3. Keep **Identify speakers** enabled. Optionally pause to review the audio before paid ASR.
 4. Submit the movie. The app prepares one continuous 16 kHz mono, signed 16-bit FLAC and streams it
    to ElevenLabs. Music and silence remain; no Demucs, local VAD, or alignment model runs.
 5. Review the source SRT, timing flags, and speaker JSON before translating. Speaker labels help
    distinguish dialogue turns, but require listening checks and do not identify characters.
+
+Scribe v3 uses the same recorded-audio API and request parameters as v2. Direct `scribe_v2` remains
+selectable for existing jobs; changing the default does not rewrite their saved model or
+checkpoints. See the [official upgrade guide](https://elevenlabs.io/docs/overview/models#scribe-v3).
 
 OpenRouter remains selectable and uses short requests. Direct ElevenLabs also supports explicit
 **Short chunks**, which retains the local processing workflow. Short requests have separate speaker
@@ -21,12 +25,13 @@ is refused after any ASR request/checkpoint exists, including uncertain requests
 
 ## Cost and account
 
-The published base rate is **USD 0.22 per audio hour**: approximately **USD 0.33 / 90 minutes** or
-**USD 0.44 / two hours**. This is a gross usage estimate, not the effective cost of a subscription
-or an invoice. Taxes, plan fees, available included usage and overage depend on your account.
-ElevenAPI offers pay-as-you-go as well as plans. OpenRouter credits are a separate balance. Use
-**Custom price / minute**, or `CLOUD_PRICE_PER_MINUTE` for scanner defaults, when your account rate
-differs. The app does not translate account credits into a verified invoice amount.
+The [published base rate](https://elevenlabs.io/pricing/api), checked 2026-11-13 for Scribe v3 and
+v2, is **USD 0.20 per audio hour**: approximately **USD 0.30 / 90 minutes** or **USD 0.40 / two
+hours**. This is a gross usage estimate, not the effective cost of a subscription or an invoice.
+Taxes, plan fees, available included usage and overage depend on your account. ElevenAPI offers
+pay-as-you-go as well as plans. OpenRouter credits are a separate balance. Use **Custom price /
+minute**, or `CLOUD_PRICE_PER_MINUTE` for scanner defaults, when your account rate differs. The app
+does not translate account credits into a verified invoice amount.
 
 The adapter does not request paid keyterms, entity processing, transcript editing or speaker-role
 detection. The app's estimate allowance is checked before submission. ElevenLabs responses do not
