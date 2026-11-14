@@ -22,6 +22,7 @@ import { formatSubtitleDocument, netflixProfile } from './subtitle-style.js';
 import type { EditorialSource } from '../../types/editorial.js';
 import {
   editorialPrompt,
+  editorialTranslationSchema,
   knownSongRule,
   validateEditorialSource,
   validateEditorialTranslation,
@@ -190,7 +191,7 @@ export async function codexStatus(options: PipelineOptions = {}) {
   }
 }
 
-export function codexArgs(workDir: string, output: string, model: string) {
+export function codexArgs(workDir: string, output: string, model: string, schemaFile?: string) {
   const args = [
     'exec',
     '--ignore-user-config',
@@ -237,6 +238,7 @@ export function codexArgs(workDir: string, output: string, model: string) {
   ])
     args.push('--disable', feature);
   if (model) args.push('--model', model);
+  if (schemaFile) args.push('--output-schema', schemaFile);
   return [...args, '-'];
 }
 
@@ -407,24 +409,32 @@ export async function translateWithCodex(
         Object.assign(receipt, { turnCompleted: true, usage });
         await writeJson(receiptFile, receipt);
       } else {
-        await run(settings.CODEX_BIN, codexArgs(workDir, candidateFile, settings.CODEX_MODEL), {
-          cwd: workDir,
-          input: evidence
-            ? editorialPrompt(source, context, evidence)
-            : codexPrompt(source, context),
-          signal: options.signal,
-          timeout: settings.CODEX_TRANSLATION_TIMEOUT_MS,
-          onStdout: (chunk) => {
-            totalBytes += chunk.length;
-            if (totalBytes > 8 * 1024 * 1024) throw new Error('Codex returned too much output');
-            pending += decoder.write(chunk);
-            let end: number;
-            while ((end = pending.indexOf('\n')) >= 0) {
-              event(pending.slice(0, end));
-              pending = pending.slice(end + 1);
-            }
+        const schemaFile = evidence
+          ? path.join(receiptDir, 'editorial-output-schema.json')
+          : undefined;
+        if (schemaFile) await writeJson(schemaFile, editorialTranslationSchema);
+        await run(
+          settings.CODEX_BIN,
+          codexArgs(workDir, candidateFile, settings.CODEX_MODEL, schemaFile),
+          {
+            cwd: workDir,
+            input: evidence
+              ? editorialPrompt(source, context, evidence)
+              : codexPrompt(source, context),
+            signal: options.signal,
+            timeout: settings.CODEX_TRANSLATION_TIMEOUT_MS,
+            onStdout: (chunk) => {
+              totalBytes += chunk.length;
+              if (totalBytes > 8 * 1024 * 1024) throw new Error('Codex returned too much output');
+              pending += decoder.write(chunk);
+              let end: number;
+              while ((end = pending.indexOf('\n')) >= 0) {
+                event(pending.slice(0, end));
+                pending = pending.slice(end + 1);
+              }
+            },
           },
-        });
+        );
         event(pending + decoder.end());
       }
       await eventWrites;

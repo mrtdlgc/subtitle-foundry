@@ -44,7 +44,12 @@ process.stdin.on('end', () => {
   const source = payload.source_srt || '';
   let result = source.replaceAll('Merhaba!', 'Hello!').replaceAll('Nasılsın?', 'How are you?');
   if (mode === 'retimed') result = result.replace('00:00:01,000', '00:00:01,001');
-  if (mode === 'editorial') result = JSON.stringify({version:1,cues:payload.runs.flatMap(r => r.anchors.map(a => ({parts:[{from:a[0],to:a[0],text:'Hello!'}],kind:'dialogue',action:'keep'})))});
+  if (mode === 'editorial') {
+    if (!args.includes('--output-schema')) throw new Error('Editorial response schema missing');
+    const schema = JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema') + 1], 'utf8'));
+    if (schema.properties.cues.items.properties.sourceCorrection.type.join(',') !== 'string,null') throw new Error('Invalid editorial response schema');
+    result = JSON.stringify({version:1,cues:payload.runs.flatMap(r => r.anchors.map(a => ({parts:[{from:a[0],to:a[0],text:'Hello!'}],kind:'dialogue',action:'keep',songUse:null,song:null,sourceCorrection:null,reason:null,review:null})))});
+  } else if (args.includes('--output-schema')) throw new Error('SRT output must not use a JSON schema');
   fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], result);
   if (mode === 'quota') console.log(JSON.stringify({ type:'turn.failed', error:{message:'429 usage limit exceeded'} }));
   else if (mode !== 'incomplete') console.log(JSON.stringify({ type:'turn.completed', usage:{input_tokens:30, output_tokens:40} }));
@@ -141,6 +146,12 @@ test('editorial CLI output publishes mapped review files and resumes without ano
   assert.equal(result.report.mode, 'editorial');
   assert.equal(result.report.timestampsIdentical, false);
   assert.equal(result.report.editorial?.coveredAnchors, 2);
+  const args = JSON.parse(await fs.readFile(path.join(f.workDir, 'received-args.json'), 'utf8'));
+  const { editorialTranslationSchema } = await import('../lib/editorial-subtitles.js');
+  assert.deepEqual(
+    JSON.parse(await fs.readFile(args[args.indexOf('--output-schema') + 1], 'utf8')),
+    editorialTranslationSchema,
+  );
   assert.ok(result.reviewSourceFile && result.reviewTargetFile);
   assert.equal(await fs.readFile(f.input, 'utf8'), source);
   const receiptFile = path.join(f.workDir, 'codex-receipt.json');
@@ -178,6 +189,11 @@ test('CLI invocation keeps subscription auth, disables tools, and strips API env
   assert.ok(args.includes('shell_tool'));
   assert.ok(args.includes('multi_agent'));
   assert.equal(args.at(-1), '-');
+  assert.ok(!args.includes('--output-schema'));
+  const schemaFile = path.join(root, 'editorial schema.json');
+  const structured = codexArgs(root, path.join(root, 'out.json'), 'my-model', schemaFile);
+  assert.equal(structured[structured.indexOf('--output-schema') + 1], schemaFile);
+  assert.equal(structured.at(-1), '-');
   assert.equal(
     childEnvironment({ CODEX_API_KEY: 'never-pass', OPENAI_API_KEY: 'never-pass' }).CODEX_API_KEY,
     undefined,

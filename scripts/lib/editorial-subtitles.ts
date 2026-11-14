@@ -15,6 +15,57 @@ import {
 } from './subtitle-style.js';
 import { validTranslation } from '../4_chunk_srt.js';
 
+// Constrain Codex's final response, not its JSONL event stream. Optional metadata
+// uses null because strict structured outputs require every property to be present.
+// Coverage, speaker boundaries and omission decisions still need validation below.
+export const editorialTranslationSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['version', 'cues'],
+  properties: {
+    version: { type: 'integer', enum: [1] },
+    cues: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'parts',
+          'kind',
+          'action',
+          'songUse',
+          'song',
+          'sourceCorrection',
+          'reason',
+          'review',
+        ],
+        properties: {
+          parts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['from', 'to', 'text'],
+              properties: {
+                from: { type: 'integer' },
+                to: { type: 'integer' },
+                text: { type: 'string' },
+              },
+            },
+          },
+          kind: { type: 'string', enum: ['dialogue', 'lyric', 'uncertain'] },
+          action: { type: 'string', enum: ['keep', 'omit'] },
+          songUse: { type: ['string', 'null'], enum: ['story', 'background', 'uncertain', null] },
+          song: { type: ['string', 'null'] },
+          sourceCorrection: { type: ['string', 'null'] },
+          reason: { type: ['string', 'null'] },
+          review: { type: ['array', 'null'], items: { type: 'string' } },
+        },
+      },
+    },
+  },
+};
+
 export const knownSongRule = `Known songs: recognize possible song titles and familiar lyrics to help interpret damaged transcription. Treat remembered lyrics as a hypothesis, never as verified audio or an online lookup. Consult only supplied references; web access is disabled. Performances may change words, verses or order. Translate only the passage actually supported by the supplied transcript and evidence, never complete a verse from memory or substitute a different recording. A high-confidence contextual repair may inform the translation, but retain the original source and report the suspected error and correction when the output format permits. If uncertain, preserve the supported meaning and flag it for listening; do not confidently invent a missing lyric.`;
 
 const join = (texts: string[]) =>
@@ -250,7 +301,7 @@ export function validateEditorialTranslation(
     if (item.action === 'omit' && (item.kind !== 'lyric' || item.songUse !== 'background'))
       throw new Error('Only incidental background lyrics may be omitted');
     const warnings: string[] = [];
-    if (item.review !== undefined) {
+    if (item.review != null) {
       if (!Array.isArray(item.review) || item.review.length > 20)
         throw new Error('Invalid editorial review notes');
       warnings.push(...item.review.map((v: unknown) => plain(v, 'review note', 500)));
@@ -313,18 +364,16 @@ export function validateEditorialTranslation(
     if (item.kind === 'uncertain') warnings.push('delivery_uncertain_listen');
     if (item.kind === 'lyric' && !anchors.every((a) => a.singing))
       warnings.push('singing_not_verified_listen');
-    const reason = item.reason === undefined ? undefined : plain(item.reason, 'decision reason');
+    const reason = item.reason == null ? undefined : plain(item.reason, 'decision reason');
     let omitted = item.action === 'omit';
     if (omitted && (!reason || !anchors.every((a) => a.singing))) {
       omitted = false;
       warnings.push('song_omission_withheld_unverified');
     }
     if (omitted) warnings.push('background_lyrics_omitted_restore_if_story_relevant');
-    const song = item.song === undefined ? undefined : plain(item.song, 'song title', 300);
+    const song = item.song == null ? undefined : plain(item.song, 'song title', 300);
     const sourceCorrection =
-      item.sourceCorrection === undefined
-        ? undefined
-        : plain(item.sourceCorrection, 'source correction');
+      item.sourceCorrection == null ? undefined : plain(item.sourceCorrection, 'source correction');
     if (song) warnings.push('song_match_unverified');
     if (sourceCorrection) warnings.push(`check_source_correction: ${sourceCorrection}`);
     const render = (texts: string[]) =>
@@ -339,7 +388,7 @@ export function validateEditorialTranslation(
       text,
       parts,
       kind: item.kind,
-      songUse: item.songUse,
+      songUse: item.songUse ?? undefined,
       song,
       sourceCorrection,
       reason,

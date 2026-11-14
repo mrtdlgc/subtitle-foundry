@@ -74,6 +74,42 @@ const plan = () => ({
 const validate = (candidate: unknown, evidence = data) =>
   validateEditorialTranslation(source, JSON.stringify(candidate), evidence);
 
+test('nullable structured metadata preserves validation and legacy saved outputs', () => {
+  const candidate = {
+    version: 1,
+    cues: plan().cues.map((cue) => ({
+      songUse: null,
+      song: null,
+      sourceCorrection: null,
+      reason: null,
+      review: null,
+      ...cue,
+    })),
+  };
+  assert.deepEqual(validate(candidate), validate(plan()));
+  candidate.cues[2].songUse = null;
+  assert.throws(() => validate(candidate), /Missing song decision/);
+  candidate.cues[2].songUse = 'background';
+  candidate.cues[2].reason = null;
+  assert.equal(validate(candidate).editorial.cues[2].omitted, false);
+  candidate.cues[0].parts[0].to = 2;
+  assert.throws(() => validate(candidate), /coverage gap/);
+});
+
+test('malformed correction-note JSON remains a validation error', () => {
+  const candidate = plan();
+  const valid = JSON.stringify({
+    ...candidate,
+    cues: candidate.cues.map((cue) => ({ ...cue, sourceCorrection: 'Check the source.' })),
+  });
+  assert.equal(validateEditorialTranslation(source, valid, data).editorial.coveredAnchors, 9);
+  const malformed = valid.replace(
+    '"sourceCorrection":"Check the source."}',
+    '"sourceCorrection":"Check the source."]}',
+  );
+  assert.throws(() => validateEditorialTranslation(source, malformed, data), /valid JSON/);
+});
+
 test('regroups native words into meaningful dialogue without punctuation cuts or invented dashes', () => {
   const result = validate(plan());
   assert.equal(result.editorial.coveredAnchors, 9);
