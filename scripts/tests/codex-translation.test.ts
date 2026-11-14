@@ -44,6 +44,7 @@ process.stdin.on('end', () => {
   const source = payload.source_srt || '';
   let result = source.replaceAll('Merhaba!', 'Hello!').replaceAll('Nasılsın?', 'How are you?');
   if (mode === 'retimed') result = result.replace('00:00:01,000', '00:00:01,001');
+  if (mode === 'placeholder-time') result = result.replace('00:00:01,000  -->  00:00:02,500', '00:53:59,? --> 00:53:59,?');
   if (mode === 'editorial') {
     if (!args.includes('--output-schema')) throw new Error('Editorial response schema missing');
     const schema = JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema') + 1], 'utf8'));
@@ -121,6 +122,48 @@ test('readability is reported without retiming or silently truncating dialogue',
   );
   assert.equal(result.warnings[0].id, '7');
   assert.match(result.srt, /A{45}/);
+});
+test('recovers placeholder clocks from source only with complete, ordered cue IDs', () => {
+  const candidate = translated.replace(
+    '00:00:01,000  -->  00:00:02,500',
+    '00:53:59,? --> 00:53:59,?',
+  );
+  assert.equal(validateCodexTranslation(source, candidate).srt, translated);
+  assert.throws(() => subtitleDocument(candidate), /Malformed SRT cue/);
+  for (const invalid of [
+    candidate.split('\r\n\r\n')[0],
+    candidate.replace('\r\n7\r\n', '\r\n001\r\n'),
+    candidate.replace(/^\uFEFF001/, '2'),
+    candidate.replace('00:53:59,? --> 00:53:59,?', 'missing timestamp'),
+    candidate.replace('00:00:02.000', '00:00:02.001'),
+    candidate.replace('How are you?', ''),
+  ])
+    assert.throws(() => validateCodexTranslation(source, invalid));
+});
+test('placeholder clocks publish and recover a failed validation receipt without another request', async () => {
+  const f = await fixture('placeholder-time');
+  await translateWithCodex(f.input, f.output, context, null, f.options);
+  assert.equal(await fs.readFile(f.output, 'utf8'), translated);
+  const candidateFile = path.join(f.workDir, 'codex-result.srt');
+  const raw = await fs.readFile(candidateFile, 'utf8');
+  assert.match(raw, /00:53:59,\?/);
+  const receiptFile = path.join(f.workDir, 'codex-receipt.json');
+  const receipt = JSON.parse(await fs.readFile(receiptFile, 'utf8'));
+  await fs.writeFile(
+    receiptFile,
+    JSON.stringify({
+      ...receipt,
+      completed: false,
+      status: 'failed',
+      failurePhase: 'validation',
+      turnCompleted: true,
+    }),
+  );
+  await fs.rm(f.output);
+  await translateWithCodex(f.input, f.output, context, null, f.options);
+  assert.equal(await fs.readFile(f.output, 'utf8'), translated);
+  assert.equal(await fs.readFile(candidateFile, 'utf8'), raw);
+  assert.equal(await fs.readFile(path.join(f.workDir, 'calls.txt'), 'utf8'), 'exec\n');
 });
 test('whole-film prompt retains all 1,042 cues as one task', () => {
   const full = Array.from(

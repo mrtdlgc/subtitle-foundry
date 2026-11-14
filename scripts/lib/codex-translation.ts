@@ -32,24 +32,50 @@ export const MAX_SUBTITLE_BYTES = 1024 * 1024;
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 const promptVersion = 5;
 
-export function subtitleDocument(text: string) {
+function subtitleBlocks(text: string) {
   if (typeof text !== 'string' || Buffer.byteLength(text) > MAX_SUBTITLE_BYTES)
     throw new Error('Complete subtitle files must be at most 1 MB');
   if (text.includes('\uFFFD') || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text))
     throw new Error('Subtitle encoding is invalid; use UTF-8 or Turkish Windows-1254');
-  const cues = parseSrt(text);
-  if (!cues.length) throw new Error('The subtitle file contains no cues');
-  const blocks = text
+  return text
     .replace(/^\uFEFF/, '')
     .replace(/\r\n?/g, '\n')
     .trim()
     .split(/\n(?:[ \t]*\n)+/);
+}
+
+export function subtitleDocument(text: string) {
+  const blocks = subtitleBlocks(text);
+  const cues = parseSrt(text);
+  if (!cues.length) throw new Error('The subtitle file contains no cues');
   return { cues, headers: blocks.map((block) => block.split('\n').slice(0, 2)) };
 }
 
 // The model only supplies text. Source IDs and timing lines are copied verbatim.
 export function validateCodexTranslation(source: string, candidate: string, language = 'en') {
   const original = subtitleDocument(source);
+  const blocks = subtitleBlocks(candidate).map((block) => block.split('\n'));
+  // Recover model-generated clock placeholders only when every cue maps to the
+  // source in order. The source owns exact timing; valid retiming and all other
+  // malformed headers still fail validation. Keep the raw provider result intact.
+  if (
+    blocks.length === original.cues.length &&
+    blocks.every((lines, index) => lines[0].trim() === original.cues[index].id)
+  ) {
+    candidate = blocks
+      .map((lines, index) => {
+        const timing = lines[1]?.trim() ?? '';
+        if (
+          timing.includes('?') &&
+          /^[\d?]{2,}:[\d?]{2}:[\d?]{2}[,.][\d?]{1,3}\s*-->\s*[\d?]{2,}:[\d?]{2}:[\d?]{2}[,.][\d?]{1,3}$/.test(
+            timing,
+          )
+        )
+          lines[1] = original.headers[index][1];
+        return lines.join('\n');
+      })
+      .join('\n\n');
+  }
   const translated = subtitleDocument(candidate);
   if (original.cues.length !== translated.cues.length)
     throw new Error(
