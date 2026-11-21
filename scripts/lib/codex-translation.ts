@@ -21,6 +21,12 @@ import { validTranslation } from '../4_chunk_srt.js';
 import { formatSubtitleDocument, netflixProfile } from './subtitle-style.js';
 import type { EditorialSource } from '../../types/editorial.js';
 import {
+  editorialPasses,
+  editorialPassSource,
+  filmContext,
+  restoreEditorialAnchorIds,
+} from './editorial-passes.js';
+import {
   editorialPrompt,
   editorialTranslationSchema,
   knownSongRule,
@@ -286,6 +292,8 @@ export async function translateWithCodex(
   const document = subtitleDocument(source);
   const evidence = context.editorial as EditorialSource | undefined;
   if (evidence) validateEditorialSource(source, evidence);
+  const passes = evidence && !context.translationPass ? editorialPasses(evidence) : [];
+  const sectioned = passes.length > 1;
   const validate = (candidate: string) =>
     evidence
       ? validateEditorialTranslation(source, candidate, evidence, context.targetLanguage)
@@ -356,6 +364,18 @@ export async function translateWithCodex(
     const status = await codexStatus(options);
     if (!status.available) throw new Error(status.message);
     await atomicWrite(path.join(receiptDir, 'source.srt'), source);
+    // Keep the original failed answer and usage receipt for diagnosis. A retry
+    // must never erase the only evidence of an earlier subscription request.
+    if (receipt) {
+      const archive = path.join(receiptDir, 'attempts', `${Date.now()}`);
+      await fs.mkdir(archive, { recursive: true });
+      await writeJson(path.join(archive, 'codex-receipt.json'), receipt);
+      await fs
+        .copyFile(candidateFile, path.join(archive, path.basename(candidateFile)))
+        .catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+    }
     await fs.rm(candidateFile, { force: true });
     receipt = {
       signature,
@@ -404,13 +424,14 @@ export async function translateWithCodex(
     const started = Date.now();
     let reporting = false;
     const heartbeat = setInterval(() => {
+      if (sectioned) return;
       if (reporting) return;
       reporting = true;
       Promise.resolve(
         options.onStage?.({
           id: 'translation',
           percentage: null,
-          detail: `Translation is running on the complete subtitle file · ${Math.floor((Date.now() - started) / 1000)}s elapsed`,
+          detail: `Translation is running ${context.translationPass ? `on section ${context.translationPass.index}/${context.translationPass.total}` : 'on the complete subtitle file'} · ${Math.floor((Date.now() - started) / 1000)}s elapsed`,
         }),
       )
         .catch(() => {})
@@ -419,7 +440,55 @@ export async function translateWithCodex(
         });
     }, 15000);
     try {
-      if (settings.TRANSLATION_PROVIDER !== 'codex-local') {
+      if (sectioned) {
+        const cues: any[] = [];
+        const totalUsage: Record<string, number> = {};
+        const wholeFilmContext = filmContext(source);
+        for (const [index, pass] of passes.entries()) {
+          checkAbort(options.signal);
+          const directory = path.join(receiptDir, 'sections', `${pass.from}-${pass.to}`);
+          const sectionContext = {
+            ...context,
+            editorial: editorialPassSource(evidence!, pass),
+            translationPass: { index: index + 1, total: passes.length },
+            wholeFilmContext,
+            previousTranslation: cues
+              .map((cue) => cue.parts.map((p: any) => p.text).join(' / '))
+              .join('\n'),
+          };
+          const result = await translateWithCodex(
+            input,
+            path.join(directory, `section-${pass.from}-${pass.to}.srt`),
+            sectionContext,
+            async (pct) =>
+              progress?.(
+                5 + (90 * (index + pct / 100)) / passes.length,
+                `Translating section ${index + 1}/${passes.length} with full-film context`,
+              ),
+            { ...options, settings, workDir: directory, receiptDir: directory },
+          );
+          const saved = await fs.readFile(path.join(directory, 'codex-result.json'), 'utf8');
+          cues.push(...restoreEditorialAnchorIds(saved, pass));
+          for (const [key, value] of Object.entries(
+            (result.report.usage ?? {}) as Record<string, unknown>,
+          ))
+            if (typeof value === 'number') totalUsage[key] = (totalUsage[key] ?? 0) + value;
+          await options.onStage?.({
+            id: 'translation',
+            status: 'running',
+            completed: index + 1,
+            total: passes.length,
+            unit: 'sections',
+            percentage: (100 * (index + 1)) / passes.length,
+            detail: `Translated ${index + 1}/${passes.length} sections; complete film retained as context`,
+          });
+        }
+        await atomicWrite(candidateFile, JSON.stringify({ version: 1, cues }));
+        usage = totalUsage;
+        completed = true;
+        Object.assign(receipt, { turnCompleted: true, usage, sections: passes.length });
+        await writeJson(receiptFile, receipt);
+      } else if (settings.TRANSLATION_PROVIDER !== 'codex-local') {
         const prompt = evidence
           ? editorialPrompt(source, context, evidence)
           : codexPrompt(source, context);
@@ -474,6 +543,10 @@ export async function translateWithCodex(
       checkAbort(options.signal);
       // Do not publish provider stderr, reasoning, prompts or credentials in job logs.
       const detail = failureMessage || String(error.message);
+      if (sectioned)
+        throw new Error(
+          `Translation stopped while processing a section. Completed sections are saved. ${detail}`,
+        );
       const reason = /usage.limit|rate.limit|quota|429/i.test(detail)
         ? 'Your translation connection reached its usage allowance.'
         : /deadline/i.test(detail)

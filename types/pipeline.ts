@@ -96,6 +96,7 @@ export interface PipelineOptions {
   progress?: (progress: number, message: string) => void | Promise<void>;
   onProgress?: (completed: number, total: number) => void | Promise<void>;
   onStage?: (update: StageUpdate) => void | Promise<void>;
+  deferTranslation?: boolean;
   worker?: WhisperWorker;
   resume?: boolean;
   checkpoint?: string;
@@ -137,6 +138,7 @@ export interface Job {
   title: string;
   type: 'audio' | 'video' | 'youtube' | 'translation';
   status: 'queued' | 'processing' | 'paused' | 'interrupted' | 'completed' | 'failed' | 'cancelled';
+  pipelinePhase?: 'translation';
   progress: number;
   stages?: StageProgress[];
   logs: { time: string; message: string }[];
@@ -171,6 +173,7 @@ export interface QueueState {
 }
 
 export interface PipelineResult {
+  translationPending?: true;
   existingSubtitleFile?: string;
   embeddedSubtitleReportFile?: string;
   subtitleOrigin?: {

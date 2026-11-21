@@ -89,6 +89,12 @@ export function stopStages(
   for (const stage of stages ?? [])
     if (stage.status === 'running') {
       stage.status = status;
+      stage.detail =
+        status === 'failed'
+          ? 'Stage failed; see the job error for details'
+          : status === 'cancelled'
+            ? 'Stage cancelled'
+            : 'Stage interrupted; saved progress is retained';
       stage.updatedAt = new Date().toISOString();
     }
 }

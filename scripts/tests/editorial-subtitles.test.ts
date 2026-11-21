@@ -110,6 +110,66 @@ test('malformed correction-note JSON remains a validation error', () => {
   assert.throws(() => validateEditorialTranslation(source, malformed, data), /valid JSON/);
 });
 
+test('zero-duration punctuation artifacts remain covered without empty viewing subtitles', () => {
+  const segments = [
+    {
+      id: '1',
+      start: 1,
+      end: 2,
+      text: 'Merhaba.',
+      words: [{ word: 'Merhaba.', start: 1, end: 2 }],
+    },
+    { id: '2', start: 3, end: 3.001, text: '،', words: [{ word: '،', start: 3, end: 3 }] },
+  ];
+  const input = segmentsToSrt(segments);
+  const evidence = editorialSource(input, segments);
+  const candidate = JSON.stringify({
+    version: 1,
+    cues: [dialogue(1, 1, 'Hello.'), dialogue(2, 2, '')],
+  });
+  const result = validateEditorialTranslation(input, candidate, evidence);
+  assert.equal(result.editorial.coveredAnchors, 2);
+  assert.equal(result.cues.length, 1);
+  assert.equal(result.editorial.cues[1].omitted, true);
+  assert.match(result.editorial.cues[1].reason!, /ASR artifact/);
+  assert.equal(parseSrt(result.reviewTarget).length, 2);
+  assert.match(result.reviewTarget, /،/);
+  for (const text of ['س', '١', 'あ', 'ก', 'word']) {
+    const modified = structuredClone(evidence);
+    modified.anchors[1].text = text;
+    assert.throws(() => validateEditorialTranslation(input, candidate, modified), /subtitle text/);
+  }
+  const timed = structuredClone(evidence);
+  timed.anchors[1].end = 3.1;
+  assert.throws(() => validateEditorialTranslation(input, candidate, timed), /subtitle text/);
+});
+
+test('native-language singing labels require the same scoped voice and never treat music as singing', () => {
+  for (const text of ['[آواز]', '[خوانندگی]', '[آواز خوانی]', '[歌声]', '[歌]', '[ร้องเพลง]']) {
+    const event = { start: 1, end: 2.5, text, speaker: 'A', speakerScope: 'movie' };
+    const matched = editorialSource(source, segments, [event]);
+    assert.ok(
+      matched.anchors.slice(0, 3).every((a) => a.singing),
+      text,
+    );
+    assert.equal(matched.anchors[3].singing, false);
+    assert.ok(
+      editorialSource(source, segments, [{ ...event, speaker: 'other' }]).anchors.every(
+        (a) => !a.singing,
+      ),
+    );
+  }
+  for (const text of ['[موسیقی]', '[音楽]', '[เพลง]', '[เสียงดนตรี]']) {
+    const result = editorialSource(source, segments, [
+      { start: 0, end: 10, text, speaker: 'A', speakerScope: 'movie' },
+    ]);
+    assert.ok(
+      result.anchors.every((a) => !a.singing),
+      text,
+    );
+  }
+});
+
 test('regroups native words into meaningful dialogue without punctuation cuts or invented dashes', () => {
   const result = validate(plan());
   assert.equal(result.editorial.coveredAnchors, 9);

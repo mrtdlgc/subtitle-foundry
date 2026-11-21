@@ -55,12 +55,28 @@ test('completed chunk counts drive progress; interruptions retain the last measu
   assert.equal(stage.percentage, (63 / 219) * 100);
   stopStages(stages, 'interrupted');
   assert.equal(stage.status, 'interrupted');
+  assert.doesNotMatch(stage.detail!, /running/);
   assert.equal(stage.completed, 63);
   assert.equal(stages.find((s) => s.id === 'transcription')?.status, 'pending');
   applyStage(stages, { id: 'chunking', completed: 219, total: 219, status: 'completed' });
   assert.equal(stage.percentage, 100);
   assert.throws(() => applyStage(stages, { id: 'chunking', completed: NaN }));
   assert.throws(() => applyStage(stages, { id: 'chunking', total: 0 }));
+});
+test('failure clears a stale running heartbeat without losing measured progress', () => {
+  const stages = createStages({ type: 'translation', settings: config });
+  applyStage(stages, {
+    id: 'translation',
+    status: 'running',
+    completed: 1,
+    total: 4,
+    detail: 'Translation is running on the complete subtitle file · 30s elapsed',
+  });
+  stopStages(stages, 'failed');
+  assert.equal(stages[0].status, 'failed');
+  assert.equal(stages[0].completed, 1);
+  assert.doesNotMatch(stages[0].detail!, /running/);
+  assert.match(stages[0].detail!, /job error/);
 });
 test('unknown percentages stay indeterminate; exact and estimated download totals are handled', () => {
   const stages = createStages({ type: 'youtube', settings: config });

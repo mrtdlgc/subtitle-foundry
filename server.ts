@@ -40,6 +40,9 @@ import {
   assertQueueCapacity,
   submissionKey,
   jobSummary,
+  jobPhase,
+  nextQueuedJob,
+  type JobPhase,
 } from './scripts/lib/queue.js';
 import { QueueStore, progressWriter } from './scripts/lib/queue-store.js';
 import { drainPaidWork } from './scripts/lib/paid-work.js';
@@ -161,7 +164,7 @@ const localAudioUploads = new Map<
     ownerId?: string;
   }
 >();
-let active: { id: string; controller: AbortController } | null = null;
+const active = new Map<string, { controller: AbortController; phase: JobPhase }>();
 let pumping = false,
   stopping = false,
   uploading = false,
@@ -395,137 +398,144 @@ async function cleanupSuccessfulJob(job: Job) {
     });
   }
 }
+async function runJob(job: Job, controller: AbortController) {
+  await asIdentity(
+    job.ownerId ? { userId: job.ownerId, sessionId: job.credentialSessionId } : undefined,
+    async () => {
+      const updates = progressWriter((mutate) => updateJob(job.id, mutate));
+      try {
+        if (hosted && (!job.ownerId || !accountExists(job.ownerId)))
+          throw new Error('The job account is unavailable');
+        const result = await runPipeline(job, {
+          signal: controller.signal,
+          resume: job.resume === true,
+          deferTranslation: jobPhase(job) === 'transcription',
+          onStage: async (update) =>
+            updates.push(
+              (item) => {
+                item.stages ??= createStages(item);
+                applyStage(item.stages, update);
+              },
+              update.status !== undefined && update.status !== 'running',
+            ),
+          onWarning: async (message) =>
+            updateJob(job.id, (item) => {
+              item.logs = [
+                ...(item.logs ?? []),
+                { time: now(), message: String(message).slice(0, 4000) },
+              ].slice(-200);
+            }),
+          progress: async (progress, message) =>
+            updates.push((item) => {
+              item.progress = Math.min(100, Math.max(0, progress));
+              item.logs = [
+                ...(item.logs ?? []),
+                { time: now(), message: String(message).slice(0, 4000) },
+              ].slice(-200);
+            }),
+        });
+        await updates.flush();
+        await updateJob(job.id, (item, state) => {
+          item.status = result.translationPending
+            ? 'queued'
+            : result.paused
+              ? 'paused'
+              : 'completed';
+          if (result.translationPending) item.pipelinePhase = 'translation';
+          item.result = result;
+          if (!result.translationPending) item.finishedAt = now();
+          item.resume = false;
+          if (item.sourceKey && !result.paused && !result.translationPending)
+            state.processed[item.sourceKey] = {
+              filename: path.basename(item.input ?? ''),
+              jobId: item.id,
+              at: now(),
+            };
+        });
+        if (!result.paused && !result.translationPending) {
+          if (job.settings.PREPARE_REVIEW !== false && !stopping)
+            await startReviewTask({ ...job, status: 'completed', result });
+          else if (job.settings.PREPARE_REVIEW === false) await cleanupSuccessfulJob(job);
+        }
+      } catch (error) {
+        await updates.flush();
+        const manifest = await readJson(at('temp', job.id, 'manifest.json'), null).catch(
+          () => null,
+        );
+        const reviewExists = await fs.access(at('output', 'reviews', `${job.id}.json`)).then(
+          () => true,
+          () => false,
+        );
+        const usageExists = await fs
+          .access(at('output', 'raw_transcriptions', job.id, 'usage.json'))
+          .then(
+            () => true,
+            () => false,
+          );
+        await updateJob(job.id, (item, state) => {
+          item.status = stopping
+            ? 'interrupted'
+            : controller.signal.aborted
+              ? 'cancelled'
+              : 'failed';
+          item.error = error.message;
+          stopStages(item.stages, item.status as 'interrupted' | 'cancelled' | 'failed');
+          item.finishedAt = now();
+          if (manifest?.partialResult) item.result = manifest.partialResult;
+          if (reviewExists)
+            item.result = { ...item.result, reviewFile: `/output/reviews/${job.id}.json` };
+          if (usageExists)
+            item.result = {
+              ...item.result,
+              usageFile: `/output/raw_transcriptions/${job.id}/usage.json`,
+            };
+          item.logs = [...(item.logs ?? []), { time: now(), message: error.message }].slice(-200);
+          if (!hosted && config.PAUSE_ON_FAILURE && item.status === 'failed')
+            pauseQueue(state, `“${item.title}” failed: ${error.message}`);
+          if (!hosted && item.status === 'interrupted')
+            pauseQueue(
+              state,
+              'A job was interrupted. Check its saved progress before resuming the queue.',
+            );
+        });
+      } finally {
+        active.delete(job.id);
+        wake();
+      }
+    },
+  );
+}
+
 async function pump() {
-  if (pumping || stopping) return;
+  if (pumping || stopping || queueFault) return;
   pumping = true;
   try {
-    while (!stopping) {
+    while (!stopping && !queueFault) {
       const controller = new AbortController();
       const job = await store.update((state) => {
-        if (queueControl(state).paused) return null;
-        const item = state.jobs.find(
-          (j) => j.status === 'queued' && (!hosted || Boolean(j.ownerId)),
-        );
+        const busy = new Set([...active.values()].map((worker) => worker.phase));
+        const item = nextQueuedJob(state, busy, hosted, new Set(active.keys()));
         if (!item) return null;
         item.status = 'processing';
         item.error = null;
-        item.startedAt = now();
+        item.startedAt ??= now();
         item.stages ??= createStages(item);
-        active = { id: item.id, controller };
+        active.set(item.id, { controller, phase: jobPhase(item) });
         return structuredClone(item);
       });
       if (!job) break;
-      await asIdentity(
-        job.ownerId ? { userId: job.ownerId, sessionId: job.credentialSessionId } : undefined,
-        async () => {
-          const updates = progressWriter((mutate) => updateJob(job.id, mutate));
-          try {
-            if (hosted && (!job.ownerId || !accountExists(job.ownerId)))
-              throw new Error('The job account is unavailable');
-            const result = await runPipeline(job, {
-              signal: controller.signal,
-              resume: job.resume === true,
-              onStage: async (update) =>
-                updates.push(
-                  (item) => {
-                    item.stages ??= createStages(item);
-                    applyStage(item.stages, update);
-                  },
-                  update.status !== undefined && update.status !== 'running',
-                ),
-              onWarning: async (message) =>
-                updateJob(job.id, (item) => {
-                  item.logs = [
-                    ...(item.logs ?? []),
-                    { time: now(), message: String(message).slice(0, 4000) },
-                  ].slice(-200);
-                }),
-              progress: async (progress, message) =>
-                updates.push((item) => {
-                  item.progress = Math.min(100, Math.max(0, progress));
-                  item.logs = [
-                    ...(item.logs ?? []),
-                    { time: now(), message: String(message).slice(0, 4000) },
-                  ].slice(-200);
-                }),
-            });
-            await updates.flush();
-            await updateJob(job.id, (item, state) => {
-              item.status = result.paused ? 'paused' : 'completed';
-              item.result = result;
-              item.finishedAt = now();
-              item.resume = false;
-              if (item.sourceKey && !result.paused)
-                state.processed[item.sourceKey] = {
-                  filename: path.basename(item.input ?? ''),
-                  jobId: item.id,
-                  at: now(),
-                };
-            });
-            if (!result.paused) {
-              if (job.settings.PREPARE_REVIEW !== false && !stopping)
-                await startReviewTask({ ...job, status: 'completed', result });
-              else if (job.settings.PREPARE_REVIEW === false) await cleanupSuccessfulJob(job);
-            }
-          } catch (error) {
-            await updates.flush();
-            const manifest = await readJson(at('temp', job.id, 'manifest.json'), null).catch(
-              () => null,
-            );
-            const reviewExists = await fs.access(at('output', 'reviews', `${job.id}.json`)).then(
-              () => true,
-              () => false,
-            );
-            const usageExists = await fs
-              .access(at('output', 'raw_transcriptions', job.id, 'usage.json'))
-              .then(
-                () => true,
-                () => false,
-              );
-            await updateJob(job.id, (item, state) => {
-              item.status = stopping
-                ? 'interrupted'
-                : controller.signal.aborted
-                  ? 'cancelled'
-                  : 'failed';
-              item.error = error.message;
-              stopStages(item.stages, item.status as 'interrupted' | 'cancelled' | 'failed');
-              item.finishedAt = now();
-              if (manifest?.partialResult) item.result = manifest.partialResult;
-              if (reviewExists)
-                item.result = { ...item.result, reviewFile: `/output/reviews/${job.id}.json` };
-              if (usageExists)
-                item.result = {
-                  ...item.result,
-                  usageFile: `/output/raw_transcriptions/${job.id}/usage.json`,
-                };
-              item.logs = [...(item.logs ?? []), { time: now(), message: error.message }].slice(
-                -200,
-              );
-              if (!hosted && config.PAUSE_ON_FAILURE && item.status === 'failed')
-                pauseQueue(state, `“${item.title}” failed: ${error.message}`);
-              if (!hosted && item.status === 'interrupted')
-                pauseQueue(
-                  state,
-                  'A job was interrupted. Check its saved progress before resuming the queue.',
-                );
-            });
-          } finally {
-            active = null;
-          }
-        },
-      );
+      void runJob(job, controller).catch((error) => {
+        active.delete(job.id);
+        queueFault = error.message;
+        console.error('Queue stopped:', error.message);
+      });
     }
   } finally {
     pumping = false;
-    // Enqueue may have happened after the last claim but before this flag reset.
+    // A job may have handed off or finished while the last claim was pending.
     const state = await store.read();
-    if (
-      !stopping &&
-      !queueFault &&
-      !queueControl(state).paused &&
-      state.jobs.some((job) => job.status === 'queued' && (!hosted || Boolean(job.ownerId)))
-    )
+    const busy = new Set([...active.values()].map((worker) => worker.phase));
+    if (!stopping && !queueFault && nextQueuedJob(state, busy, hosted, new Set(active.keys())))
       setImmediate(wake);
   }
 }
@@ -1187,7 +1197,7 @@ router.post('/api/queue/control', async (req, res) => {
     if (paused !== undefined)
       Object.assign(control, {
         paused,
-        reason: paused ? 'Paused by you. The current job may finish.' : null,
+        reason: paused ? 'Paused by you. Active jobs may finish.' : null,
       });
     if (scannerEnabled !== undefined) control.scannerEnabled = scannerEnabled;
     control.updatedAt = now();
@@ -1418,8 +1428,9 @@ router.delete('/api/jobs/:id', async (req, res) => {
 router.post('/api/jobs/:id/cancel', async (req, res) => {
   const id = jobId(req.params.id);
   await updateJob(id, (job) => {
-    if (active?.id === id) {
-      active.controller.abort();
+    const worker = active.get(id);
+    if (worker) {
+      worker.controller.abort();
       return;
     }
     if (['queued', 'paused', 'interrupted'].includes(job.status)) job.status = 'cancelled';
@@ -1807,10 +1818,16 @@ router.get('/api/status', async (req, res) => {
           : null
         : queueFault || control.reason,
       maxQueuedJobs: config.MAX_QUEUED_JOBS,
-      isProcessing: state.jobs.some((job) => job.id === active?.id),
+      isProcessing: state.jobs.some((job) => active.has(job.id)),
+      activeJobs: state.jobs
+        .filter((job) => active.has(job.id))
+        .map((job) => ({ id: job.id, title: job.title, phase: active.get(job.id)!.phase })),
       pendingJobs: pending.length,
       pendingTitles: pending.slice(0, 20).map((j) => j.title),
-      currentTitle: state.jobs.find((j) => j.id === active?.id)?.title,
+      currentTitle: state.jobs
+        .filter((job) => active.has(job.id))
+        .map((job) => job.title)
+        .join(' · '),
     },
     storage: {
       ...(await storageStatus()),
@@ -1904,20 +1921,23 @@ async function shutdown() {
   server.close();
   console.log('Shutdown: waiting for submitted transcription responses to be saved');
   await draining;
-  active?.controller.abort();
+  for (const worker of active.values()) worker.controller.abort();
   const deadline = Date.now() + 15000;
-  while ((pumping || uploading || scanning || reviewTasks.size) && Date.now() < deadline)
+  while (
+    (pumping || active.size || uploading || scanning || reviewTasks.size) &&
+    Date.now() < deadline
+  )
     await new Promise((resolve) => setTimeout(resolve, 100));
   // Release the kernel lock only once work has stopped; process exit closes it too.
-  if (!pumping && !uploading && !scanning && !reviewTasks.size) await releaseLock();
-  process.exit(pumping || uploading || scanning || reviewTasks.size ? 1 : 0);
+  if (!pumping && !active.size && !uploading && !scanning && !reviewTasks.size) await releaseLock();
+  process.exit(pumping || active.size || uploading || scanning || reviewTasks.size ? 1 : 0);
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 function fatal(error: unknown) {
   console.error('Fatal server error:', error);
-  active?.controller.abort();
+  for (const worker of active.values()) worker.controller.abort();
   for (const controller of reviewTasks.values()) controller.abort();
   uploadAbort?.abort();
   terminateChildren();

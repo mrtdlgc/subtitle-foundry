@@ -45,11 +45,14 @@ process.stdin.on('end', () => {
   let result = source.replaceAll('Merhaba!', 'Hello!').replaceAll('Nasılsın?', 'How are you?');
   if (mode === 'retimed') result = result.replace('00:00:01,000', '00:00:01,001');
   if (mode === 'placeholder-time') result = result.replace('00:00:01,000  -->  00:00:02,500', '00:53:59,? --> 00:53:59,?');
-  if (mode === 'editorial') {
+  if (mode === 'editorial' || mode === 'editorial-partial') {
     if (!args.includes('--output-schema')) throw new Error('Editorial response schema missing');
     const schema = JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema') + 1], 'utf8'));
     if (schema.properties.cues.items.properties.sourceCorrection.type.join(',') !== 'string,null') throw new Error('Invalid editorial response schema');
     result = JSON.stringify({version:1,cues:payload.runs.flatMap(r => r.anchors.map(a => ({parts:[{from:a[0],to:a[0],text:'Hello!'}],kind:'dialogue',action:'keep',songUse:null,song:null,sourceCorrection:null,reason:null,review:null})))});
+    if (mode === 'editorial-partial' && process.cwd().endsWith('101-130') && fs.readFileSync('calls.txt','utf8').trim().split('\\n').length === 1) {
+      const partial = JSON.parse(result); partial.cues.pop(); result = JSON.stringify(partial);
+    }
   } else if (args.includes('--output-schema')) throw new Error('SRT output must not use a JSON schema');
   fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], result);
   if (mode === 'quota') console.log(JSON.stringify({ type:'turn.failed', error:{message:'429 usage limit exceeded'} }));
@@ -224,6 +227,58 @@ test('editorial CLI output publishes mapped review files and resumes without ano
     /start a new job/,
   );
 });
+test('large editorial jobs keep full-film context, validate each section and resume only unfinished work', async () => {
+  const { editorialSource } = await import('../lib/editorial-subtitles.js');
+  const { segmentsToSrt } = await import('../lib/srt.js');
+  const f = await fixture('editorial-partial');
+  const full = segmentsToSrt(
+    Array.from({ length: 130 }, (_, i) => ({
+      id: String(i + 1),
+      start: i * 3,
+      end: i * 3 + 1,
+      text: `Merhaba! Scene ${i + 1}.`,
+    })),
+  );
+  await fs.writeFile(f.input, full);
+  const ctx = { ...context, editorial: editorialSource(full) };
+  await assert.rejects(
+    translateWithCodex(f.input, f.output, ctx, null, f.options),
+    /leaves anchors 30 onward/,
+  );
+  await assert.rejects(fs.access(f.output));
+  const first = path.join(f.workDir, 'sections', '1-100');
+  const second = path.join(f.workDir, 'sections', '101-130');
+  assert.equal(await fs.readFile(path.join(first, 'calls.txt'), 'utf8'), 'exec\n');
+  const prompt = await fs.readFile(path.join(second, 'received-prompt.txt'), 'utf8');
+  const payload = JSON.parse(prompt.split('\n').at(-1)!);
+  assert.match(payload.wholeFilmContext, /Scene 1\./);
+  assert.match(payload.wholeFilmContext, /Scene 130\./);
+  assert.match(payload.previousTranslation, /Hello!/);
+  assert.match(prompt, /section 2 of 2/);
+  // No-inference recovery must not repeat the known incomplete section.
+  await assert.rejects(
+    translateWithCodex(f.input, f.output, ctx, null, f.options),
+    /leaves anchors 30 onward/,
+  );
+  assert.equal(await fs.readFile(path.join(second, 'calls.txt'), 'utf8'), 'exec\n');
+  const result = await translateWithCodex(f.input, f.output, ctx, null, {
+    ...f.options,
+    retryCodex: true,
+  });
+  assert.equal(result.report.editorial?.coveredAnchors, 130);
+  assert.equal(result.report.cues, 130);
+  assert.equal(await fs.readFile(path.join(first, 'calls.txt'), 'utf8'), 'exec\n');
+  assert.equal(await fs.readFile(path.join(second, 'calls.txt'), 'utf8'), 'exec\nexec\n');
+  const candidate = JSON.parse(
+    await fs.readFile(path.join(f.workDir, 'codex-result.json'), 'utf8'),
+  );
+  assert.equal(candidate.cues.at(-1).parts[0].to, 130);
+  assert.deepEqual(result.report.usage, { input_tokens: 60, output_tokens: 80 });
+  assert.ok((await fs.readdir(path.join(second, 'attempts'))).length);
+  await translateWithCodex(f.input, f.output, ctx, null, f.options);
+  assert.equal(await fs.readFile(path.join(second, 'calls.txt'), 'utf8'), 'exec\nexec\n');
+});
+
 test('CLI invocation keeps subscription auth, disables tools, and strips API environment secrets', () => {
   const args = codexArgs(root, path.join(root, 'out.srt'), 'my-model');
   assert.ok(args.includes('--ignore-user-config'));

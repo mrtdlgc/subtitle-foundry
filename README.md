@@ -101,6 +101,10 @@ finish before updates or shutdown. After initialization, change the workspace pa
 **Connections**, not by editing `APP_PASSWORD`. See [deployment and backups](DEPLOYMENT.md) for
 optional local models, Compose environment forwarding and VPS operation.
 
+For a systemd service, use `KillMode=mixed` and a `TimeoutStopSec` longer than `SHUTDOWN_GRACE_MS`
+plus 15 seconds. The initial stop signal must reach only the server so its queue-lock helpers remain
+alive while submitted transcription responses are saved.
+
 ## Guides and support boundaries
 
 - [Transcription providers](TRANSCRIPTION_PROVIDERS.md): adapters, versioned model catalog and
@@ -281,10 +285,10 @@ Choose a **Local file** in Studio, submit a YouTube video, or put films in the s
 and draws its waveform. The movie stays on that computer; the server runs the selected translation
 connection and stores corrections. Enable server-folder watching in **Library** after saving the
 provider key. The scanner observes files twice and waits for stability; it fills at most 20 waiting
-slots and checks the remaining films on later scans. **Pause queue** lets the current job finish and
-prevents the next one from starting. Failures and interrupted restarts pause the queue for
-inspection. Failed, interrupted and paused jobs remain visible; use Retry/Resume instead of creating
-duplicate jobs. A scanner reset allows a finished film to be submitted again.
+slots and checks the remaining films on later scans. **Pause queue** lets active work finish and
+prevents either worker from starting another job. Failures and interrupted restarts pause the queue
+for inspection. Failed, interrupted and paused jobs remain visible; use Retry/Resume instead of
+creating duplicate jobs. A scanner reset allows a finished film to be submitted again.
 
 Docker removes temporary media only after successful completion by default. Turn on **Keep temporary
 audio after success** for comparison work. Subtitles, raw ASR checkpoints, translation receipts and
@@ -327,6 +331,15 @@ per-job retention checkbox is enabled. Use **Details → Remove intermediate aud
 review; it removes that job's resume files and disables retry. Exported subtitles, raw responses and
 review reports remain. History deletion requires cache cleanup first, so retained audio does not
 become unreachable through the UI.
+
+The queue prepares and transcribes one film while another translates. Each worker handles one film
+at a time. Source subtitles and a recovery checkpoint are saved before a film joins the translation
+queue, so waiting translations do not hold up the next transcription. Pausing the queue lets active
+work finish and prevents either worker from starting another job.
+
+If retained films reach the temporary-storage budget while disk space remains available, raise
+`MAX_TEMP_BYTES` in the server environment and restart after active work finishes. YouTube downloads
+reserve `MAX_UPLOAD_BYTES`, so leave that much headroom above the retained cache.
 
 Job Details provides source/target subtitle downloads, a review report, and flagged cues. The report
 contains:
@@ -377,10 +390,10 @@ translate automatically after transcription.
 With Codex selected, this invokes the installed `codex exec` using the server user's existing
 **ChatGPT login**. The CLI runs on the server; the model runs in the cloud and uses the server
 owner’s Codex allowance. This subscription connection does not read/copy OAuth credentials or switch
-to API-key billing. No translation splitting is performed: each film is one task with the complete
-subtitle context. An optional model field selects a model available to your Codex account; blank
-uses the CLI default. Translation runs with high reasoning and without shell, browser, connector, or
-subagent tools.
+to API-key billing. Each film remains one job. Long editorial translations use saved sections with
+the complete film text supplied as context in every request. An optional model field selects a model
+available to your Codex account; blank uses the CLI default. Translation runs with high reasoning
+and without shell, browser, connector, or subagent tools.
 
 Choose **Editorial** for natural translated subtitles. This is the default for new media jobs and
 library selections. The translation model can regroup adjacent words from one voice into complete
@@ -445,14 +458,19 @@ the whole film. Native timing is retained for listening and correction; target w
 mechanically or clipped to force a duration. Missing content and speaker-boundary violations still
 block publication. A completed model result rejected by local validation is retained and can be
 revalidated after a validator fix, without another translation request. Failed model execution is
-tracked separately and is not treated as a locally rejected success.
+tracked separately and is not treated as a locally rejected success. Zero-duration native ASR words
+containing only punctuation are retained in the coverage/review record but excluded from viewing
+subtitles; an empty translation for actual speech still fails.
 
 Results appear in the job queue with cancellation and explicit retry. These checks establish
 structural integrity, not linguistic accuracy or Netflix delivery certification. Review a real film
 before release; the fixture suite does not evaluate live model translation quality. Partial/failed
 translation responses are never published. There is no automatic retry that silently spends more
-plan allowance or API usage. A verified result is reusable after interruption; an incomplete task
-starts over when you explicitly retry.
+plan allowance or API usage. Long editorial translations use bounded sections, each supplied with
+the complete film text and the English wording already chosen. Every section is validated and saved
+before the next request; the final export must cover every original anchor exactly once. An explicit
+retry reuses completed sections and repeats only unfinished work. Previous failed answers and their
+usage receipts are retained under `translation-receipts/JOB_ID/attempts/`.
 
 The editorial targets follow Netflix's
 [English timed-text guide](https://partnerhelp.netflixstudios.com/hc/en-us/articles/217350977-English-USA-Timed-Text-Style-Guide),

@@ -371,6 +371,21 @@ async function finalize(manifest: any, srt: string, sourceLanguage: string, opti
     manifest.partialResult = result;
     await writeJson(at('temp', id, 'manifest.json'), manifest);
     if (settings.TRANSLATION_ENABLED) {
+      // Save a durable handoff before releasing the transcription worker. A retry
+      // can translate this exact source without repeating audio processing or ASR.
+      manifest.stage = 'translation-ready';
+      manifest.translationSourceHash = subtitleHash(srt);
+      manifest.translationSpeakers = options.speakers;
+      await writeJson(at('temp', id, 'manifest.json'), manifest);
+      if (options.deferTranslation) {
+        await options.onStage?.({
+          id: 'translation',
+          status: 'pending',
+          percentage: null,
+          detail: 'Transcript saved; waiting for the translation worker',
+        });
+        return { ...result, translationPending: true as const };
+      }
       await options.onStage?.({
         id: 'translation',
         percentage: null,
@@ -609,9 +624,27 @@ export async function runPipeline(job: any, options: PipelineOptions = {}) {
     progress,
     onLog: (message: string) => process.stderr.write(message),
     onStage: options.onStage,
+    deferTranslation: options.deferTranslation,
     retryCodex: job.codexRetry,
   };
   if (manifest.stage === 'completed') return manifest.result;
+  if (manifest.stage === 'translation-ready') {
+    const sourceLanguage = manifest.partialResult.sourceLanguage;
+    const sourceFile = at(
+      'output',
+      'subtitles',
+      `${titleSlug(manifest.title)}_${id}_${sourceLanguage}.srt`,
+    );
+    const source = await fs.readFile(sourceFile, 'utf8');
+    if (subtitleHash(source) !== manifest.translationSourceHash)
+      throw new Error('Saved transcript changed before translation; restore the saved source');
+    // Existing tracks retain their own hash check as well as the exported source check.
+    if (manifest.existingSubtitles) return reuseSubtitles(manifest, null, common);
+    return finalize(manifest, source, sourceLanguage, {
+      ...common,
+      speakers: manifest.translationSpeakers,
+    });
+  }
   if (!manifest.chunks) {
     if (manifest.existingSubtitles) return reuseSubtitles(manifest, null, common);
     if (manifest.localSubtitle) {

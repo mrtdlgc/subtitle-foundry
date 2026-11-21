@@ -2,6 +2,30 @@ import { createHash } from 'node:crypto';
 import { config } from '../../config.js';
 import type { Job, QueueState } from '../../types/pipeline.js';
 
+export type JobPhase = 'transcription' | 'translation';
+
+export function jobPhase(job: Pick<Job, 'type' | 'pipelinePhase'>): JobPhase {
+  return job.type === 'translation' || job.pipelinePhase === 'translation'
+    ? 'translation'
+    : 'transcription';
+}
+
+export function nextQueuedJob(
+  state: QueueState,
+  busy: Set<JobPhase>,
+  hosted = false,
+  activeIds = new Set<string>(),
+) {
+  if (queueControl(state).paused) return undefined;
+  return state.jobs.find(
+    (job) =>
+      job.status === 'queued' &&
+      !activeIds.has(job.id) &&
+      (!hosted || Boolean(job.ownerId)) &&
+      !busy.has(jobPhase(job)),
+  );
+}
+
 export function queueControl(state: QueueState) {
   return (state.control ??= {
     paused: false,
@@ -41,6 +65,7 @@ export function jobSummary(job: Job) {
     type: job.type,
     localMedia: Boolean(job.localMedia),
     status: job.status,
+    pipelinePhase: job.pipelinePhase,
     progress: job.progress,
     stages: job.stages,
     error: job.error,

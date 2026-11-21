@@ -1123,7 +1123,7 @@ function renderStatus(status: StatusView, found: { filename: string }[]) {
   $('scannerControlBtn').textContent = scannerEnabled ? 'Disable watching' : 'Enable watching';
   $('queueControlStatus').textContent = queuePaused
     ? `Queue paused. ${status.queue.reason || ''} Retry failed jobs as needed, then resume when ready.`
-    : `One film runs at a time · ${status.queue.pendingJobs}/${status.queue.maxQueuedJobs} waiting. Pausing lets the current job finish.`;
+    : `Transcription and translation can run together · ${status.queue.pendingJobs}/${status.queue.maxQueuedJobs} waiting. Pausing lets active jobs finish.`;
   const gib = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
   $('storageStatus').textContent =
     `${gib(status.storage.temporaryBytes)} / ${gib(status.storage.maxTemporaryBytes)} GiB temporary media · ${gib(status.storage.availableBytes)} GiB disk available · ${gib(status.storage.screeningBytes || 0)} GiB screenings · ${gib(status.storage.transcriptBytes || 0)} GiB provider transcripts`;
