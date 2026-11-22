@@ -256,9 +256,20 @@ for (const provider of cases)
       return sse(empty ? [] : provider.events(translated + 'İ', bad));
     });
     try {
-      const result = await responseTranslation('full subtitle context', settings);
+      let receivedBytes = 0;
+      const events: unknown[] = [];
+      const result = await responseTranslation('full subtitle context', settings, undefined, {
+        data: (bytes) => {
+          receivedBytes += bytes;
+        },
+        event: (value) => {
+          events.push(value);
+        },
+      });
       assert.equal(result.text, translated + 'İ');
       assert.ok(result.usage);
+      assert.ok(receivedBytes > 0);
+      assert.ok(events.length > 0);
       bad = true;
       await assert.rejects(responseTranslation('context', settings));
       empty = true;

@@ -37,6 +37,7 @@ import { withTempBudget, storageStatus, directoryBytes } from './scripts/lib/sto
 import {
   queueControl,
   pauseQueue,
+  resumeQueueForRetry,
   assertQueueCapacity,
   submissionKey,
   jobSummary,
@@ -491,7 +492,7 @@ async function runJob(job: Job, controller: AbortController) {
             };
           item.logs = [...(item.logs ?? []), { time: now(), message: error.message }].slice(-200);
           if (!hosted && config.PAUSE_ON_FAILURE && item.status === 'failed')
-            pauseQueue(state, `“${item.title}” failed: ${error.message}`);
+            pauseQueue(state, `“${item.title}” failed: ${error.message}`, item.id);
           if (!hosted && item.status === 'interrupted')
             pauseQueue(
               state,
@@ -1198,6 +1199,7 @@ router.post('/api/queue/control', async (req, res) => {
       Object.assign(control, {
         paused,
         reason: paused ? 'Paused by you. Active jobs may finish.' : null,
+        failureJobId: null,
       });
     if (scannerEnabled !== undefined) control.scannerEnabled = scannerEnabled;
     control.updatedAt = now();
@@ -1465,6 +1467,7 @@ async function retry(id: string | string[], maxEstimatedCost?: unknown, retryCod
     }
     // Only the explicit review-pause resume authorizes crossing the audio gate.
     job.resume = job.status === 'paused' || job.resume === true;
+    resumeQueueForRetry(state, job);
     job.status = 'queued';
     job.error = null;
     job.codexRetry = retryCodex;

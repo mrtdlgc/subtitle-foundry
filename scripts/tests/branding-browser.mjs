@@ -203,6 +203,73 @@ try {
   assert.equal(result.createdLegacyDatabase, false);
   assert.deepEqual(result.recovered, result.waveform);
   assert.deepEqual(result.copied, result.waveform);
+  await page.route('**/api/jobs?*', async (route) => {
+    const now = Date.now();
+    const jobs = ['responding', 'waiting', 'possibly-stalled'].map((state, index) => ({
+      id: `activity-${index}`,
+      title: `Activity fixture: ${state}`,
+      type: 'translation',
+      status: 'processing',
+      progress: 87,
+      logs: [],
+      stages: [
+        {
+          id: 'translation',
+          label: 'Subtitle translation',
+          status: 'running',
+          percentage: null,
+          completed: 2,
+          total: 16,
+          unit: 'sections',
+          activity: {
+            startedAt: new Date(now - (index === 2 ? 360000 : 30000)).toISOString(),
+            observedAt: new Date(now).toISOString(),
+            lastDataAt: new Date(now - 2000).toISOString(),
+            lastResponseAt: index === 0 ? new Date(now - 2000).toISOString() : null,
+            lastRetryAt: null,
+            responseEvents: index === 0 ? 3 : 0,
+            receivedBytes: 500,
+            timeoutMs: 1800000,
+            visibility: 'events',
+            scope: 'Section 3/16',
+          },
+        },
+      ],
+    }));
+    await route.fulfill({ json: { jobs, total: jobs.length } });
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('[data-view="studio"]').click();
+  await page.locator('#jobsList [data-activity="responding"]').waitFor();
+  assert.match(
+    await page.locator('#jobsList [data-activity="responding"] .stage-heading').innerText(),
+    /Receiving response/,
+  );
+  assert.match(
+    await page.locator('#jobsList [data-activity="waiting"] .stage-heading').innerText(),
+    /Waiting for response/,
+  );
+  assert.match(
+    await page.locator('#jobsList [data-activity="possibly-stalled"] .stage-heading').innerText(),
+    /2\/16 sections · Possibly stalled/,
+  );
+  assert.match(
+    await page
+      .locator('#jobsList [data-activity="possibly-stalled"] .stage-activity-note')
+      .innerText(),
+    /do not confirm translation progress/,
+  );
+  await page
+    .locator('#jobsList')
+    .screenshot({ path: '/tmp/subtitle-foundry-translation-activity.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    'activity status fits mobile',
+  );
+  await page.locator('#jobsList').screenshot({
+    path: '/tmp/subtitle-foundry-translation-activity-mobile.png',
+  });
   await page.goto(origin + '/review-player.html');
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(
@@ -212,7 +279,7 @@ try {
   assert.match(await page.locator('.brand').innerText(), /SUBTITLE\s+FOUNDRY/);
   assert.deepEqual(errors, []);
   console.log(
-    'Branding browser checks passed: desktop/mobile, login, session namespace, drafts and waveform migration.',
+    'Browser checks passed: desktop/mobile, login, session namespace, drafts, waveform migration and translation activity states.',
   );
 } finally {
   await browser?.close();

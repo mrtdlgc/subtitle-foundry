@@ -39,6 +39,10 @@ process.stdin.on('end', () => {
   fs.appendFileSync('calls.txt', 'exec\\n');
   fs.writeFileSync('received-prompt.txt', input);
   fs.writeFileSync('received-args.json', JSON.stringify(args));
+  if (mode === 'activity') {
+    console.log(JSON.stringify({type:'thread.started',thread_id:'fixture'}));
+    console.log(JSON.stringify({type:'item.completed',item:{type:'reasoning',text:'private model text must not reach status'}}));
+  }
   if (mode === 'slow') { setInterval(() => {}, 1000); return; }
   const payload = JSON.parse(input.split('\\n').at(-1));
   const source = payload.source_srt || '';
@@ -125,6 +129,23 @@ test('readability is reported without retiming or silently truncating dialogue',
   );
   assert.equal(result.warnings[0].id, '7');
   assert.match(result.srt, /A{45}/);
+});
+test('translation activity reaches status and receipts without storing response contents', async () => {
+  const f = await fixture('activity');
+  const updates: any[] = [];
+  await translateWithCodex(f.input, f.output, context, null, {
+    ...f.options,
+    onStage: (update) => {
+      updates.push(structuredClone(update));
+    },
+  });
+  assert.ok(updates.some((update) => update.activity?.responseEvents > 0));
+  assert.ok(updates.some((update) => /Receiving response/.test(update.detail ?? '')));
+  const receipt = JSON.parse(await fs.readFile(path.join(f.workDir, 'codex-receipt.json'), 'utf8'));
+  assert.ok(receipt.activity.receivedBytes > 0);
+  assert.ok(receipt.activity.lastResponseAt);
+  assert.doesNotMatch(JSON.stringify(updates), /private model text/);
+  assert.doesNotMatch(JSON.stringify(receipt), /private model text/);
 });
 test('recovers placeholder clocks from source only with complete, ordered cue IDs', () => {
   const candidate = translated.replace(

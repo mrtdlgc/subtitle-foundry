@@ -80,7 +80,7 @@ process.stdin.on('end', () => {
           CODEX_MODEL: id,
           TRANSLATION_PROVIDER: 'codex-local',
           TRANSLATION_MODE: 'fixed',
-          KEEP_INTERMEDIATES: false,
+          KEEP_INTERMEDIATES: id === 'bad',
         },
       })),
     };
@@ -215,7 +215,16 @@ process.stdin.on('end', () => {
       assert.equal((await (await request('/api/status')).json()).queue.paused, true);
       assert.equal((await (await request('/api/jobs/good')).json()).status, 'queued');
       await assert.rejects(fs.access(path.join(data, 'temp/good/calls.txt')));
-      await request('/api/queue/control', { paused: false });
+      // Repair the saved candidate locally, then retry without another model call.
+      const candidate = path.join(data, 'data/translation-receipts/bad/codex-result.srt');
+      await fs.writeFile(candidate, source.replace('Merhaba.', 'Hello.'));
+      assert.equal((await request('/api/jobs/bad/retry', { retryCodex: false })).status, 200);
+      await until(
+        async () => (await (await request('/api/jobs/bad')).json()).status === 'completed',
+        'Retry should resume the queue and recover the saved translation',
+      );
+      assert.equal((await (await request('/api/status')).json()).queue.paused, false);
+      assert.equal(await fs.readFile(path.join(data, 'temp/bad/calls.txt'), 'utf8'), 'exec\n');
       await until(
         async () => (await (await request('/api/jobs/good')).json()).intermediatesRemoved === true,
         'Successful job did not clean up',

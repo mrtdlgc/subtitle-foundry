@@ -472,6 +472,15 @@ before the next request; the final export must cover every original anchor exact
 retry reuses completed sections and repeats only unfinished work. Previous failed answers and their
 usage receipts are retained under `translation-receipts/JOB_ID/attempts/`.
 
+Translation status separates elapsed time from actual response activity. It shows when response
+content last arrived, how many sections are saved, and whether it is waiting or reconnecting. After
+five minutes without response progress, it warns **Possibly stalled**; timer ticks, start
+acknowledgements and connection keepalives do not count as progress. This is an uncertainty warning,
+not proof that the provider stopped working. Connections that only report finished replies are
+identified as such. Activity records store timestamps and counts, never response text or reasoning.
+The warning does not trigger another request; the existing deadline and manual retry remain in
+force.
+
 The editorial targets follow Netflix's
 [English timed-text guide](https://partnerhelp.netflixstudios.com/hc/en-us/articles/217350977-English-USA-Timed-Text-Style-Guide),
 [template guide](https://partnerhelp.netflixstudios.com/hc/en-us/articles/219375728-Timed-Text-Style-Guide-Subtitle-Templates)

@@ -32,6 +32,7 @@ export interface RequestState {
   reconciliation?: { at: string; note: string; newAttemptAuthorized: boolean };
 }
 export interface CodexReceipt {
+  activity?: import('../public/translation-activity.js').TranslationActivity;
   signature: string;
   completed: boolean;
   status: 'running' | 'failed' | 'complete';

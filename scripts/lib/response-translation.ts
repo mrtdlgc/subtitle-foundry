@@ -86,6 +86,7 @@ export async function responseTranslation(
   prompt: string,
   settings: Settings,
   signal?: AbortSignal,
+  activity?: { data: (bytes: number) => void; event: (value: unknown) => void },
 ) {
   const provider = translationProvider(settings.TRANSLATION_PROVIDER);
   const token =
@@ -141,6 +142,7 @@ export async function responseTranslation(
         return;
       }
       const value = JSON.parse(payload);
+      activity?.event(value);
       if (value.error || value.type === 'error')
         throw new Error('Translation provider rejected the request');
       if (provider.id === 'openrouter-api') {
@@ -217,6 +219,7 @@ export async function responseTranslation(
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
+        activity?.data(value.length);
         size += value.length;
         if (size > 16 * 1024 * 1024) throw new Error('Translation stream exceeded its size limit');
         pending += decoder.decode(value, { stream: true });

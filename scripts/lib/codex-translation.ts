@@ -3,6 +3,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
+import {
+  TranslationActivityTracker,
+  translationActivityView,
+} from '../../public/translation-activity.js';
 import { config } from '../../config.js';
 import type { PipelineOptions, Segment } from '../../types/pipeline.js';
 import { at, atomicWrite, readJson, writeJson } from './files.js';
@@ -387,11 +391,29 @@ export async function translateWithCodex(
         `${translationProvider(settings.TRANSLATION_PROVIDER).name} default`,
       cliVersion: status.version,
     };
+    const activity = new TranslationActivityTracker(
+      context.translationPass
+        ? `Section ${context.translationPass.index}/${context.translationPass.total}`
+        : 'Complete subtitle file',
+      settings.CODEX_TRANSLATION_TIMEOUT_MS,
+      ['claude-local', 'grok-local'].includes(settings.TRANSLATION_PROVIDER)
+        ? 'completion-only'
+        : 'events',
+    );
+    if (!sectioned) receipt.activity = activity.snapshot();
     await writeJson(receiptFile, receipt);
     await progress?.(
       5,
       `Translating the complete subtitle file (${document.cues.length} cues) using your selected connection.`,
     );
+    if (!sectioned)
+      await options.onStage?.({
+        id: 'translation',
+        status: 'running',
+        percentage: null,
+        activity: receipt.activity,
+        detail: translationActivityView(receipt.activity!).detail,
+      });
     let pending = '',
       totalBytes = 0,
       completed = false,
@@ -403,6 +425,7 @@ export async function translateWithCodex(
     const event = (line: string) => {
       if (!line.trim()) return;
       const value = JSON.parse(line);
+      if (activity.event(value)) reportActivity();
       if (value.type === 'turn.completed') {
         completed = true;
         usage = value.usage ?? null;
@@ -421,24 +444,32 @@ export async function translateWithCodex(
       }
       void eventWrites.catch(() => {});
     };
-    const started = Date.now();
-    let reporting = false;
-    const heartbeat = setInterval(() => {
+    let reporting = false,
+      lastReported = 0;
+    const reportActivity = (force = false) => {
       if (sectioned) return;
       if (reporting) return;
+      if (!force && Date.now() - lastReported < 1000) return;
       reporting = true;
-      Promise.resolve(
-        options.onStage?.({
+      lastReported = Date.now();
+      const snapshot = activity.snapshot();
+      eventWrites = eventWrites.then(async () => {
+        receipt!.activity = snapshot;
+        await writeJson(receiptFile, receipt);
+        await options.onStage?.({
           id: 'translation',
           percentage: null,
-          detail: `Translation is running ${context.translationPass ? `on section ${context.translationPass.index}/${context.translationPass.total}` : 'on the complete subtitle file'} · ${Math.floor((Date.now() - started) / 1000)}s elapsed`,
-        }),
-      )
-        .catch(() => {})
+          activity: snapshot,
+          detail: translationActivityView(snapshot).detail,
+        });
+      });
+      void eventWrites
         .finally(() => {
           reporting = false;
-        });
-    }, 15000);
+        })
+        .catch(() => {});
+    };
+    const heartbeat = setInterval(() => reportActivity(true), 15000);
     try {
       if (sectioned) {
         const cues: any[] = [];
@@ -497,7 +528,14 @@ export async function translateWithCodex(
             ? await claudeTranslation(prompt, settings, { ...options, workDir })
             : settings.TRANSLATION_PROVIDER === 'grok-local'
               ? await grokTranslation(prompt, settings, options)
-              : await responseTranslation(prompt, settings, options.signal);
+              : await responseTranslation(prompt, settings, options.signal, {
+                  data: (bytes) => activity.data(bytes),
+                  event: (value) => {
+                    if (activity.event(value)) reportActivity();
+                  },
+                });
+        activity.response();
+        reportActivity();
         await atomicWrite(candidateFile, response.text);
         usage = response.usage;
         completed = true;
@@ -518,7 +556,9 @@ export async function translateWithCodex(
               : codexPrompt(source, context),
             signal: options.signal,
             timeout: settings.CODEX_TRANSLATION_TIMEOUT_MS,
+            onStderr: (message) => activity.diagnostic(message),
             onStdout: (chunk) => {
+              activity.data(chunk.length);
               totalBytes += chunk.length;
               if (totalBytes > 8 * 1024 * 1024) throw new Error('Codex returned too much output');
               pending += decoder.write(chunk);
@@ -536,7 +576,9 @@ export async function translateWithCodex(
       if (!completed || failed)
         throw new Error(failureMessage || 'Codex did not complete the translation');
     } catch (error) {
+      clearInterval(heartbeat);
       await eventWrites;
+      if (!sectioned) receipt.activity = activity.snapshot();
       receipt.status = 'failed';
       receipt.failurePhase = 'execution';
       await writeJson(receiptFile, receipt);
@@ -559,6 +601,7 @@ export async function translateWithCodex(
       );
     } finally {
       clearInterval(heartbeat);
+      if (!sectioned) receipt.activity = activity.snapshot();
     }
     const stat = await fs.stat(candidateFile);
     if (stat.size > resultLimit) throw new Error('Translation result exceeds its size limit');
@@ -583,6 +626,7 @@ export async function translateWithCodex(
         translationModel(settings) ||
         `${translationProvider(settings.TRANSLATION_PROVIDER).name} default`,
       cliVersion: status.version,
+      ...(!sectioned ? { activity: activity.snapshot() } : {}),
     };
     await writeJson(receiptFile, receipt);
   }

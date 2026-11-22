@@ -1,5 +1,10 @@
 import { prepareLocalMedia } from './local-media.js';
 import { rememberLocalFile } from './local-files.js';
+import {
+  legacyTranslationActivity,
+  translationActivityView,
+  type TranslationActivity,
+} from './translation-activity.js';
 const BASE = window.APP_BASE_PATH || '';
 const hosted = window.APP_HOSTED === true;
 const translationProvider = () => $<HTMLSelectElement>('translationConnection').value;
@@ -248,6 +253,8 @@ function empty(container: HTMLElement, message: string) {
 }
 
 interface StageView {
+  activity?: TranslationActivity;
+  updatedAt?: string;
   id: string;
   label: string;
   status: string;
@@ -262,6 +269,13 @@ function stageBars(stages: StageView[] = []) {
   for (const stage of stages) {
     const row = element('div', null, 'pipeline-stage');
     row.dataset.status = stage.status;
+    const activity =
+      stage.id === 'translation' && stage.status === 'running'
+        ? stage.activity
+          ? translationActivityView(stage.activity)
+          : legacyTranslationActivity(stage.detail, stage.updatedAt)
+        : null;
+    if (activity) row.dataset.activity = activity.state;
     const heading = element('div', null, 'stage-heading');
     const states: Record<string, string> = {
       pending: 'Waiting',
@@ -272,7 +286,7 @@ function stageBars(stages: StageView[] = []) {
       cancelled: 'Cancelled',
       interrupted: 'Interrupted',
     };
-    const state = states[stage.status] ?? stage.status;
+    const state = activity?.label ?? states[stage.status] ?? stage.status;
     const measured = stage.percentage !== null && Number.isFinite(stage.percentage);
     const percentage = measured ? Math.max(0, Math.min(100, stage.percentage!)) : null;
     let summary = state;
@@ -293,7 +307,10 @@ function stageBars(stages: StageView[] = []) {
     if (stage.status === 'running' && percentage === null) bar.removeAttribute('value');
     else bar.value = stage.status === 'skipped' ? 0 : (percentage ?? 0);
     row.append(heading, bar);
-    if (stage.detail) row.append(element('p', stage.detail, 'stage-detail'));
+    if (activity) {
+      row.append(element('p', activity.detail, 'stage-detail'));
+      row.append(element('p', activity.note, 'stage-activity-note'));
+    } else if (stage.detail) row.append(element('p', stage.detail, 'stage-detail'));
     group.append(row);
   }
   return group;

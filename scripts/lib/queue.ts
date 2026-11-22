@@ -35,12 +35,34 @@ export function queueControl(state: QueueState) {
   });
 }
 
-export function pauseQueue(state: QueueState, reason: string) {
-  Object.assign(queueControl(state), {
+export function pauseQueue(state: QueueState, reason: string, failureJobId?: string) {
+  const control = queueControl(state);
+  // A failure from an active worker must not replace an intentional queue pause.
+  if (control.paused) return;
+  Object.assign(control, {
     paused: true,
     reason,
+    failureJobId: failureJobId ?? null,
     updatedAt: new Date().toISOString(),
   });
+}
+
+export function resumeQueueForRetry(state: QueueState, job: Job) {
+  const control = queueControl(state);
+  const causedPause =
+    control.failureJobId === job.id ||
+    // Queues saved before failureJobId existed can still identify their exact failure.
+    (control.failureJobId === undefined &&
+      Boolean(job.error) &&
+      control.reason === `“${job.title}” failed: ${job.error}`);
+  if (!control.paused || job.status !== 'failed' || !causedPause) return false;
+  Object.assign(control, {
+    paused: false,
+    reason: null,
+    failureJobId: null,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
 }
 
 export function assertQueueCapacity(state: QueueState, maximum = config.MAX_QUEUED_JOBS) {

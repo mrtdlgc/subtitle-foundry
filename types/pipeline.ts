@@ -1,6 +1,7 @@
 import type { config } from '../config.js';
 import type { WhisperWorker } from '../scripts/lib/whisper-worker.js';
 import type { LocalMedia } from '../public/local-types.js';
+import type { TranslationActivity } from '../public/translation-activity.js';
 
 export type Settings = typeof config;
 export type StageId =
@@ -18,6 +19,7 @@ export type StageId =
 export type StageStatus =
   'pending' | 'running' | 'completed' | 'skipped' | 'failed' | 'cancelled' | 'interrupted';
 export interface StageProgress {
+  activity?: TranslationActivity;
   id: StageId;
   label: string;
   status: StageStatus;
@@ -29,6 +31,7 @@ export interface StageProgress {
   updatedAt?: string;
 }
 export interface StageUpdate {
+  activity?: TranslationActivity;
   id: StageId;
   status?: StageStatus;
   percentage?: number | null;
@@ -167,6 +170,7 @@ export interface QueueState {
   control?: {
     paused: boolean;
     reason: string | null;
+    failureJobId?: string | null;
     scannerEnabled: boolean;
     updatedAt: string;
   };

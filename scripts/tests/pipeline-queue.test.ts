@@ -12,7 +12,8 @@ import type { Job, QueueState } from '../../types/pipeline.js';
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-foundry-queue-'));
 process.env.DATA_DIR = root;
 const { config } = await import('../../config.js');
-const { nextQueuedJob, jobPhase } = await import('../lib/queue.js');
+const { nextQueuedJob, jobPhase, pauseQueue, resumeQueueForRetry } =
+  await import('../lib/queue.js');
 const { run, childEnvironment } = await import('../lib/process.js');
 const { writeJson, readJson, at } = await import('../lib/files.js');
 const { runPipeline } = await import('../pipeline.js');
@@ -65,6 +66,30 @@ test('pause and eligibility apply to both workers, including hosted ownership', 
   assert.equal(nextQueuedJob(state, new Set(), true), undefined);
   state.control!.paused = true;
   assert.equal(nextQueuedJob(state, new Set()), undefined);
+});
+
+test('retry clears only the failure pause belonging to the retried job', () => {
+  const failed = job('failed', { status: 'failed', error: 'Request timed out' });
+  const other = job('other', { status: 'failed', error: 'Another failure' });
+  const state = queue([failed, other]);
+  pauseQueue(state, `“${failed.title}” failed: ${failed.error}`, failed.id);
+  assert.equal(resumeQueueForRetry(state, other), false);
+  assert.equal(state.control!.paused, true);
+  assert.equal(resumeQueueForRetry(state, failed), true);
+  assert.equal(state.control!.paused, false);
+  assert.equal(state.control!.reason, null);
+  assert.equal(state.control!.failureJobId, null);
+
+  pauseQueue(state, 'Paused by you. Active jobs may finish.');
+  pauseQueue(state, `“${failed.title}” failed: ${failed.error}`, failed.id);
+  assert.equal(resumeQueueForRetry(state, failed), false);
+  assert.equal(state.control!.reason, 'Paused by you. Active jobs may finish.');
+
+  delete state.control!.failureJobId;
+  state.control!.reason = `“${failed.title}” failed: ${failed.error}`;
+  assert.equal(resumeQueueForRetry(state, failed), true, 'legacy failure pause is recognized');
+  pauseQueue(state, 'A job was interrupted. Check its saved progress before resuming the queue.');
+  assert.equal(resumeQueueForRetry(state, failed), false, 'other pause reasons remain in force');
 });
 
 test(

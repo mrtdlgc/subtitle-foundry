@@ -697,6 +697,18 @@ details.panel > summary {
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+.pipeline-stage .stage-activity-note {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 5px 0 0;
+}
+.pipeline-stage[data-activity='possibly-stalled'] .stage-heading span,
+.pipeline-stage[data-activity='possibly-stalled'] .stage-detail,
+.pipeline-stage[data-activity='unavailable'] .stage-heading span {
+  color: #a34420;
+  font-weight: 600;
+}
 .pipeline-stage progress:not([value])::-webkit-progress-bar {
   background: repeating-linear-gradient(100deg, #e8e1d7 0 15px, #d1c4b6 15px 30px);
 }
