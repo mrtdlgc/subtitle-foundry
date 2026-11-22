@@ -205,7 +205,7 @@ try {
   assert.deepEqual(result.copied, result.waveform);
   await page.route('**/api/jobs?*', async (route) => {
     const now = Date.now();
-    const jobs = ['responding', 'waiting', 'possibly-stalled'].map((state, index) => ({
+    const jobs = ['responding', 'waiting', 'possibly-stalled', 'retrying'].map((state, index) => ({
       id: `activity-${index}`,
       title: `Activity fixture: ${state}`,
       type: 'translation',
@@ -221,6 +221,15 @@ try {
           completed: 2,
           total: 16,
           unit: 'sections',
+          retry:
+            state === 'retrying'
+              ? {
+                  attempt: 1,
+                  maximum: 3,
+                  nextAt: new Date(now + 30000).toISOString(),
+                  reason: 'the request timed out',
+                }
+              : null,
           activity: {
             startedAt: new Date(now - (index === 2 ? 360000 : 30000)).toISOString(),
             observedAt: new Date(now).toISOString(),
@@ -262,6 +271,14 @@ try {
   await page
     .locator('#jobsList')
     .screenshot({ path: '/tmp/subtitle-foundry-translation-activity.png' });
+  assert.match(
+    await page.locator('#jobsList [data-activity="retrying"] .stage-heading').innerText(),
+    /Automatic retry 1\/3/,
+  );
+  assert.match(
+    await page.locator('#jobsList [data-activity="retrying"] .stage-detail').innerText(),
+    /Retrying in/,
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

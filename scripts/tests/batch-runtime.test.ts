@@ -134,6 +134,7 @@ process.stdin.on('end', () => {
           ELEVENLABS_API_KEY: '',
           TRANSLATION_ENABLED: 'false',
           PAUSE_ON_FAILURE: 'true',
+          TRANSLATION_AUTO_RETRIES: '0',
           SCANNER_ENABLED: 'false',
           KEEP_INTERMEDIATES: 'false',
         },

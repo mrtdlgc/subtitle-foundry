@@ -142,6 +142,8 @@ export const config = {
   CODEX_MODEL: process.env.TRANSLATION_MODEL || process.env.CODEX_MODEL || '', // Legacy setting name; empty uses the selected provider default
   TRANSLATION_MAX_OUTPUT_TOKENS: Number(process.env.TRANSLATION_MAX_OUTPUT_TOKENS || 32768),
   CODEX_TRANSLATION_TIMEOUT_MS: Number(process.env.CODEX_TRANSLATION_TIMEOUT_MS || 30 * 60 * 1000),
+  TRANSLATION_AUTO_RETRIES: Number(process.env.TRANSLATION_AUTO_RETRIES ?? 3),
+  TRANSLATION_RETRY_DELAY_MS: Number(process.env.TRANSLATION_RETRY_DELAY_MS ?? 30000),
   TRANSLATION_CONTEXT_WINDOW: 5, // Sentences before/after for context
   TRANSLATION_BATCH_SIZE: 10, // Sentences per LLM request
   TRANSLATION_RETRY_ATTEMPTS: 3, // Retry failed translations

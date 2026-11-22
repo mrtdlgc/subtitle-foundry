@@ -110,6 +110,10 @@ let input = '';
 process.stdin.on('data', data => input += data);
 process.stdin.on('end', () => {
   fs.appendFileSync(${JSON.stringify(marker)}, process.cwd() + '\\n');
+  if (fs.readFileSync(${JSON.stringify(marker)}, 'utf8').trim().split('\\n').length === 1) {
+    console.log(JSON.stringify({type:'turn.failed',error:{message:'socket ECONNRESET'}}));
+    return;
+  }
   const timer = setInterval(() => {
     if (!fs.existsSync(${JSON.stringify(release)})) return;
     clearInterval(timer);
@@ -207,6 +211,8 @@ process.stdin.on('end', () => {
           CODEX_BIN: fake,
           LOCAL_AUDIO_ENABLED: 'false',
           SHUTDOWN_GRACE_MS: '5000',
+          TRANSLATION_AUTO_RETRIES: '3',
+          TRANSLATION_RETRY_DELAY_MS: '3000',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -259,15 +265,35 @@ process.stdin.on('end', () => {
         const state = await readJson<QueueState>(queueFile);
         return (
           state.jobs[0].status === 'processing' &&
+          state.jobs[0].translationRetry?.attempt === 1 &&
+          Boolean(state.jobs[0].translationRetry?.nextAt) &&
           state.jobs
             .slice(1)
             .every((item) => item.status === 'queued' && item.pipelinePhase === 'translation')
         );
       });
       assert.equal(posts, 3, 'all three films transcribe while the first translation is blocked');
+      const pendingRetry = (await readJson<QueueState>(queueFile)).jobs[0].translationRetry!;
+      const retryExit = once(server, 'exit');
+      server.kill('SIGTERM');
+      assert.equal((await retryExit)[0], 0, logs);
+      assert.equal((await readJson<QueueState>(queueFile)).jobs[0].status, 'queued');
+      server = start();
+      await login();
+      assert.equal((await request('/api/status')).queue.paused, false);
+      await waitFor(
+        async () => (await fs.readFile(marker, 'utf8')).trim().split('\n').length === 2,
+      );
+      const resumedRetry = (await readJson<QueueState>(queueFile)).jobs[0].translationRetry!;
+      assert.equal(
+        resumedRetry.attempt,
+        pendingRetry.attempt,
+        'restart preserves the reserved retry budget',
+      );
+      assert.equal(resumedRetry.nextAt, null);
       assert.equal(
         (await fs.readFile(marker, 'utf8')).trim().split('\n').length,
-        1,
+        2,
         'translation requests remain sequential',
       );
       const status = await request('/api/status');
@@ -283,7 +309,7 @@ process.stdin.on('end', () => {
       );
       assert.equal(
         (await fs.readFile(marker, 'utf8')).trim().split('\n').length,
-        1,
+        2,
         'pause prevents waiting translations from starting',
       );
       const exit = once(server, 'exit');
@@ -304,7 +330,7 @@ process.stdin.on('end', () => {
         (await readJson<QueueState>(queueFile)).jobs.every((item) => item.status === 'completed'),
       );
       assert.equal(posts, 3, 'restart must not submit any transcript again');
-      assert.equal((await fs.readFile(marker, 'utf8')).trim().split('\n').length, 3);
+      assert.equal((await fs.readFile(marker, 'utf8')).trim().split('\n').length, 4);
       for (const item of jobs) {
         assert.match(
           await fs.readFile(at('output', 'subtitles', `${item.id}_${item.id}_en.srt`), 'utf8'),

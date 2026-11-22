@@ -3,6 +3,8 @@ import { rememberLocalFile } from './local-files.js';
 import {
   legacyTranslationActivity,
   translationActivityView,
+  translationRetryView,
+  type TranslationRetryState,
   type TranslationActivity,
 } from './translation-activity.js';
 const BASE = window.APP_BASE_PATH || '';
@@ -253,6 +255,7 @@ function empty(container: HTMLElement, message: string) {
 }
 
 interface StageView {
+  retry?: TranslationRetryState | null;
   activity?: TranslationActivity;
   updatedAt?: string;
   id: string;
@@ -271,9 +274,11 @@ function stageBars(stages: StageView[] = []) {
     row.dataset.status = stage.status;
     const activity =
       stage.id === 'translation' && stage.status === 'running'
-        ? stage.activity
-          ? translationActivityView(stage.activity)
-          : legacyTranslationActivity(stage.detail, stage.updatedAt)
+        ? stage.retry?.nextAt
+          ? translationRetryView(stage.retry)
+          : stage.activity
+            ? translationActivityView(stage.activity)
+            : legacyTranslationActivity(stage.detail, stage.updatedAt)
         : null;
     if (activity) row.dataset.activity = activity.state;
     const heading = element('div', null, 'stage-heading');

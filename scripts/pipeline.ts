@@ -626,6 +626,7 @@ export async function runPipeline(job: any, options: PipelineOptions = {}) {
     onStage: options.onStage,
     deferTranslation: options.deferTranslation,
     retryCodex: job.codexRetry,
+    translationRetryFeedback: options.translationRetryFeedback,
   };
   if (manifest.stage === 'completed') return manifest.result;
   if (manifest.stage === 'translation-ready') {

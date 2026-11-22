@@ -11,6 +11,7 @@ import { config } from '../../config.js';
 import type { PipelineOptions, Segment } from '../../types/pipeline.js';
 import { at, atomicWrite, readJson, writeJson } from './files.js';
 import { checkAbort, run } from './process.js';
+import { TranslationFailure, translationFailureKind } from './translation-retry.js';
 import { parseSrt } from './srt.js';
 import { hosted } from './identity.js';
 import { responseStatus, responseTranslation } from './response-translation.js';
@@ -298,6 +299,15 @@ export async function translateWithCodex(
   if (evidence) validateEditorialSource(source, evidence);
   const passes = evidence && !context.translationPass ? editorialPasses(evidence) : [];
   const sectioned = passes.length > 1;
+  const requestPrompt = () => {
+    const prompt = evidence
+      ? editorialPrompt(source, context, evidence)
+      : codexPrompt(source, context);
+    return options.translationRetryFeedback
+      ? 'This is a retry of an unfinished or invalid translation. Return the complete required output and check every anchor or cue before finishing. Never use ellipsis-only text, TODO, or other placeholders as a translation. If a source passage cannot be understood, preserve its source text and flag the uncertainty in editorial review notes; do not invent dialogue or silently drop it.\n' +
+          prompt
+      : prompt;
+  };
   const validate = (candidate: string) =>
     evidence
       ? validateEditorialTranslation(source, candidate, evidence, context.targetLanguage)
@@ -520,9 +530,7 @@ export async function translateWithCodex(
         Object.assign(receipt, { turnCompleted: true, usage, sections: passes.length });
         await writeJson(receiptFile, receipt);
       } else if (settings.TRANSLATION_PROVIDER !== 'codex-local') {
-        const prompt = evidence
-          ? editorialPrompt(source, context, evidence)
-          : codexPrompt(source, context);
+        const prompt = requestPrompt();
         const response =
           settings.TRANSLATION_PROVIDER === 'claude-local'
             ? await claudeTranslation(prompt, settings, { ...options, workDir })
@@ -551,9 +559,7 @@ export async function translateWithCodex(
           codexArgs(workDir, candidateFile, settings.CODEX_MODEL, schemaFile),
           {
             cwd: workDir,
-            input: evidence
-              ? editorialPrompt(source, context, evidence)
-              : codexPrompt(source, context),
+            input: requestPrompt(),
             signal: options.signal,
             timeout: settings.CODEX_TRANSLATION_TIMEOUT_MS,
             onStderr: (message) => activity.diagnostic(message),
@@ -586,18 +592,23 @@ export async function translateWithCodex(
       // Do not publish provider stderr, reasoning, prompts or credentials in job logs.
       const detail = failureMessage || String(error.message);
       if (sectioned)
-        throw new Error(
+        throw new TranslationFailure(
           `Translation stopped while processing a section. Completed sections are saved. ${detail}`,
+          error instanceof TranslationFailure ? error.kind : 'other',
         );
-      const reason = /usage.limit|rate.limit|quota|429/i.test(detail)
-        ? 'Your translation connection reached its usage allowance.'
-        : /deadline/i.test(detail)
-          ? 'The translation reached its time limit.'
-          : /401|unauthorized|refresh.token|sign.in/i.test(detail)
-            ? 'Your translation connection needs to be renewed.'
-            : 'The selected provider could not finish the complete subtitle file.';
-      throw new Error(
+      const kind =
+        error instanceof TranslationFailure ? error.kind : translationFailureKind(detail);
+      const reason =
+        kind === 'quota'
+          ? 'Your translation connection reached its usage allowance.'
+          : kind === 'timeout'
+            ? 'The translation reached its time limit.'
+            : kind === 'auth'
+              ? 'Your translation connection needs to be renewed.'
+              : 'The selected provider could not finish the complete subtitle file.';
+      throw new TranslationFailure(
         `${reason} No translation was published and no provider or billing fallback was used. Check the selected connection, then retry manually.`,
+        kind,
       );
     } finally {
       clearInterval(heartbeat);
@@ -612,7 +623,7 @@ export async function translateWithCodex(
       receipt.status = 'failed';
       receipt.failurePhase = 'validation';
       await writeJson(receiptFile, receipt);
-      throw error;
+      throw new TranslationFailure(error.message, 'validation');
     }
     await atomicWrite(candidateFile, candidate);
     receipt = {

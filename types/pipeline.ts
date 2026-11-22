@@ -19,6 +19,7 @@ export type StageId =
 export type StageStatus =
   'pending' | 'running' | 'completed' | 'skipped' | 'failed' | 'cancelled' | 'interrupted';
 export interface StageProgress {
+  retry?: import('../public/translation-activity.js').TranslationRetryState | null;
   activity?: TranslationActivity;
   id: StageId;
   label: string;
@@ -31,6 +32,7 @@ export interface StageProgress {
   updatedAt?: string;
 }
 export interface StageUpdate {
+  retry?: import('../public/translation-activity.js').TranslationRetryState | null;
   activity?: TranslationActivity;
   id: StageId;
   status?: StageStatus;
@@ -105,6 +107,7 @@ export interface PipelineOptions {
   checkpoint?: string;
   receiptDir?: string;
   retryCodex?: boolean;
+  translationRetryFeedback?: boolean;
   sourceLanguage?: string;
   targetLanguage?: string;
   input?: string;
@@ -162,6 +165,7 @@ export interface Job {
   intermediatesRemoved?: boolean;
   submissionKey?: string;
   codexRetry?: boolean;
+  translationRetry?: import('../public/translation-activity.js').TranslationRetryState;
 }
 export interface QueueState {
   version: number;

@@ -48,7 +48,8 @@ import {
 import { QueueStore, progressWriter } from './scripts/lib/queue-store.js';
 import { drainPaidWork } from './scripts/lib/paid-work.js';
 import { inspectRequests, reconcileRequest } from './scripts/lib/request-recovery.js';
-import { probe, terminateChildren } from './scripts/lib/process.js';
+import { probe, terminateChildren, abortError } from './scripts/lib/process.js';
+import { withTranslationRetries } from './scripts/lib/translation-retry.js';
 import { runPipeline, validateSettings } from './scripts/pipeline.js';
 import { validateYouTubeUrl } from './scripts/1_download_video.js';
 import {
@@ -194,6 +195,12 @@ await store.update(async (state) => {
       if (stage) stage.status = 'interrupted';
     }
     if (job.status === 'processing') {
+      if (jobPhase(job) === 'translation' && job.translationRetry?.nextAt) {
+        // No request is in flight during a persisted retry countdown.
+        job.status = 'queued';
+        job.error = null;
+        continue;
+      }
       if (!hosted)
         pauseQueue(
           state,
@@ -407,34 +414,70 @@ async function runJob(job: Job, controller: AbortController) {
       try {
         if (hosted && (!job.ownerId || !accountExists(job.ownerId)))
           throw new Error('The job account is unavailable');
-        const result = await runPipeline(job, {
-          signal: controller.signal,
-          resume: job.resume === true,
-          deferTranslation: jobPhase(job) === 'transcription',
-          onStage: async (update) =>
-            updates.push(
-              (item) => {
-                item.stages ??= createStages(item);
-                applyStage(item.stages, update);
+        const result = await withTranslationRetries(
+          async (attempt) => {
+            if (stopping) throw abortError();
+            return runPipeline(
+              { ...job, codexRetry: attempt > 0 ? true : job.codexRetry },
+              {
+                signal: controller.signal,
+                translationRetryFeedback: attempt > 0,
+                resume: job.resume === true,
+                deferTranslation: jobPhase(job) === 'transcription',
+                onStage: async (update) =>
+                  updates.push(
+                    (item) => {
+                      item.stages ??= createStages(item);
+                      applyStage(item.stages, update);
+                    },
+                    update.status !== undefined && update.status !== 'running',
+                  ),
+                onWarning: async (message) =>
+                  updateJob(job.id, (item) => {
+                    item.logs = [
+                      ...(item.logs ?? []),
+                      { time: now(), message: String(message).slice(0, 4000) },
+                    ].slice(-200);
+                  }),
+                progress: async (progress, message) =>
+                  updates.push((item) => {
+                    item.progress = Math.min(100, Math.max(0, progress));
+                    item.logs = [
+                      ...(item.logs ?? []),
+                      { time: now(), message: String(message).slice(0, 4000) },
+                    ].slice(-200);
+                  }),
               },
-              update.status !== undefined && update.status !== 'running',
-            ),
-          onWarning: async (message) =>
-            updateJob(job.id, (item) => {
-              item.logs = [
-                ...(item.logs ?? []),
-                { time: now(), message: String(message).slice(0, 4000) },
-              ].slice(-200);
-            }),
-          progress: async (progress, message) =>
-            updates.push((item) => {
-              item.progress = Math.min(100, Math.max(0, progress));
-              item.logs = [
-                ...(item.logs ?? []),
-                { time: now(), message: String(message).slice(0, 4000) },
-              ].slice(-200);
-            }),
-        });
+            );
+          },
+          {
+            enabled: jobPhase(job) === 'translation' && job.codexRetry !== false,
+            maximum: config.TRANSLATION_AUTO_RETRIES,
+            delayMs: config.TRANSLATION_RETRY_DELAY_MS,
+            signal: controller.signal,
+            initial: job.translationRetry,
+            onState: async (retry) => {
+              await updates.flush();
+              job.translationRetry = retry;
+              await updateJob(job.id, (item) => {
+                item.translationRetry = retry;
+                item.stages ??= createStages(item);
+                const message = retry.nextAt
+                  ? `Automatic translation retry ${retry.attempt}/${retry.maximum} scheduled for ${retry.nextAt}: ${retry.reason}. Completed sections will be reused.`
+                  : `Starting automatic translation retry ${retry.attempt}/${retry.maximum}; reusing completed sections.`;
+                applyStage(item.stages, {
+                  id: 'translation',
+                  status: 'running',
+                  percentage: null,
+                  activity: undefined,
+                  retry: retry.nextAt ? retry : null,
+                  detail: message,
+                });
+                item.logs = [...(item.logs ?? []), { time: now(), message }].slice(-200);
+              });
+            },
+          },
+        );
         await updates.flush();
         await updateJob(job.id, (item, state) => {
           item.status = result.translationPending
@@ -474,6 +517,11 @@ async function runJob(job: Job, controller: AbortController) {
             () => false,
           );
         await updateJob(job.id, (item, state) => {
+          if (stopping && jobPhase(item) === 'translation' && item.translationRetry?.nextAt) {
+            item.status = 'queued';
+            item.error = null;
+            return;
+          }
           item.status = stopping
             ? 'interrupted'
             : controller.signal.aborted
@@ -1468,6 +1516,9 @@ async function retry(id: string | string[], maxEstimatedCost?: unknown, retryCod
     // Only the explicit review-pause resume authorizes crossing the audio gate.
     job.resume = job.status === 'paused' || job.resume === true;
     resumeQueueForRetry(state, job);
+    delete job.translationRetry;
+    const translation = job.stages?.find((stage) => stage.id === 'translation');
+    if (translation) translation.retry = null;
     job.status = 'queued';
     job.error = null;
     job.codexRetry = retryCodex;

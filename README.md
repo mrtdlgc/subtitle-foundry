@@ -465,12 +465,21 @@ subtitles; an empty translation for actual speech still fails.
 Results appear in the job queue with cancellation and explicit retry. These checks establish
 structural integrity, not linguistic accuracy or Netflix delivery certification. Review a real film
 before release; the fixture suite does not evaluate live model translation quality. Partial/failed
-translation responses are never published. There is no automatic retry that silently spends more
-plan allowance or API usage. Long editorial translations use bounded sections, each supplied with
-the complete film text and the English wording already chosen. Every section is validated and saved
-before the next request; the final export must cover every original anchor exactly once. An explicit
-retry reuses completed sections and repeats only unfinished work. Previous failed answers and their
-usage receipts are retained under `translation-receipts/JOB_ID/attempts/`.
+translation responses are never published. Temporary connection failures, timeouts and invalid model
+replies automatically retry up to three times per job, after 30, 60 and 120 seconds. The queue shows
+the retry number, reason and countdown. Retries use the same selected connection and can consume
+additional plan allowance or API usage; they never repeat transcription or switch providers. Login,
+exhausted-quota and source-integrity errors still require attention. Set
+`TRANSLATION_AUTO_RETRIES=0` to disable, or configure its limit (0–10) and
+`TRANSLATION_RETRY_DELAY_MS`. Cancel interrupts both requests and retry waits. Pending retry counts
+and deadlines survive restart; an interrupted live request still requires review. Manual Retry
+starts a fresh retry budget.
+
+Long editorial translations use bounded sections, each supplied with the complete film text and the
+English wording already chosen. Every section is validated and saved before the next request; the
+final export must cover every original anchor exactly once. An explicit retry reuses completed
+sections and repeats only unfinished work. Previous failed answers and their usage receipts are
+retained under `translation-receipts/JOB_ID/attempts/`.
 
 Translation status separates elapsed time from actual response activity. It shows when response
 content last arrived, how many sections are saved, and whether it is waiting or reconnecting. After
@@ -478,8 +487,8 @@ five minutes without response progress, it warns **Possibly stalled**; timer tic
 acknowledgements and connection keepalives do not count as progress. This is an uncertainty warning,
 not proof that the provider stopped working. Connections that only report finished replies are
 identified as such. Activity records store timestamps and counts, never response text or reasoning.
-The warning does not trigger another request; the existing deadline and manual retry remain in
-force.
+The warning itself does not trigger another request. Automatic retry starts only after an actual
+retryable failure; the current request keeps its existing deadline.
 
 The editorial targets follow Netflix's
 [English timed-text guide](https://partnerhelp.netflixstudios.com/hc/en-us/articles/217350977-English-USA-Timed-Text-Style-Guide),
@@ -490,7 +499,8 @@ Visual placement, linguistic accuracy and ambiguous singing still need screening
 
 Native installs: run `codex login` as the same OS user running the app. Docker includes the CLI; run
 `codex login --device-auth` in its terminal once. Set `CODEX_BIN` to an absolute executable path if
-it is outside the service's PATH. `CODEX_TRANSLATION_TIMEOUT_MS` defaults to 30 minutes per film.
+it is outside the service's PATH. `CODEX_TRANSLATION_TIMEOUT_MS` defaults to 30 minutes per request
+(per section for sectioned films).
 [Official Codex non-interactive documentation](https://learn.chatgpt.com/docs/non-interactive-mode)
 describes the supported CLI interface; [authentication](https://learn.chatgpt.com/docs/auth)
 explains ChatGPT subscription login. The standard CPU Docker image includes Codex. It needs its own

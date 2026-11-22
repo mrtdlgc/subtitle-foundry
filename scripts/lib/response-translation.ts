@@ -3,6 +3,7 @@ import { chatGPTStatus, chatGPTToken } from './chatgpt-oauth.js';
 import { assertPaidSubmissionAllowed, trackPaidWork } from './paid-work.js';
 import { translationProvider, translationModel } from './translation-providers.js';
 import type { Settings } from '../../types/pipeline.js';
+import { TranslationFailure, translationFailureKind } from './translation-retry.js';
 
 export async function responseStatus(settings: Settings) {
   const provider = translationProvider(settings.TRANSLATION_PROVIDER);
@@ -104,9 +105,18 @@ export async function responseTranslation(
       body: JSON.stringify(request.body),
     });
     if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error(
+      let kind = translationFailureKind(`HTTP ${response.status}`);
+      if (response.status === 429) {
+        // A temporary rate limit and exhausted credits can both use HTTP 429.
+        const body: any = await response.json().catch(() => null);
+        const error = body?.error ?? body;
+        if (translationFailureKind(`${error?.code} ${error?.type} ${error?.message}`) === 'quota')
+          kind = 'quota';
+      }
+      await response.body?.cancel().catch(() => {});
+      throw new TranslationFailure(
         `Translation provider returned HTTP ${response.status}. Check your connection and allowance; retry manually.`,
+        kind,
       );
     }
     if (!response.body) throw new Error('Translation response was empty');

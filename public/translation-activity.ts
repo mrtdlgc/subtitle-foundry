@@ -1,4 +1,20 @@
 export const TRANSLATION_QUIET_MS = 5 * 60 * 1000;
+export interface TranslationRetryState {
+  attempt: number;
+  maximum: number;
+  nextAt: string | null;
+  reason: string;
+}
+
+export function translationRetryView(retry: TranslationRetryState, now = Date.now()) {
+  const remaining = Math.max(0, Date.parse(retry.nextAt ?? '') - now);
+  return {
+    state: 'retrying',
+    label: `Automatic retry ${retry.attempt}/${retry.maximum}`,
+    detail: `${retry.nextAt ? `Retrying in ${activityDuration(remaining)}` : 'Retrying now'} because ${retry.reason}.`,
+    note: 'Completed sections are saved and will be reused. Transcription is not repeated.',
+  };
+}
 const RECENT_MS = 90 * 1000;
 
 export interface TranslationActivity {

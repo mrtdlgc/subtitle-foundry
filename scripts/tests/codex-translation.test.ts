@@ -300,6 +300,55 @@ test('large editorial jobs keep full-film context, validate each section and res
   assert.equal(await fs.readFile(path.join(second, 'calls.txt'), 'utf8'), 'exec\nexec\n');
 });
 
+test('automatic validation retry reuses finished sections and supplies corrective feedback', async () => {
+  const { withTranslationRetries } = await import('../lib/translation-retry.js');
+  const { editorialSource } = await import('../lib/editorial-subtitles.js');
+  const { segmentsToSrt } = await import('../lib/srt.js');
+  const f = await fixture('editorial-partial');
+  const full = segmentsToSrt(
+    Array.from({ length: 130 }, (_, i) => ({
+      id: String(i + 1),
+      start: i * 3,
+      end: i * 3 + 1,
+      text: `Merhaba! Scene ${i + 1}.`,
+    })),
+  );
+  await fs.writeFile(f.input, full);
+  const retries: number[] = [];
+  const result = await withTranslationRetries(
+    (attempt) =>
+      translateWithCodex(
+        f.input,
+        f.output,
+        { ...context, editorial: editorialSource(full) },
+        null,
+        { ...f.options, retryCodex: attempt > 0, translationRetryFeedback: attempt > 0 },
+      ),
+    {
+      enabled: true,
+      maximum: 3,
+      delayMs: 1,
+      onState: async (state) => {
+        if (state.nextAt) retries.push(state.attempt);
+      },
+    },
+  );
+  assert.deepEqual(retries, [1]);
+  assert.equal(result.report.editorial?.coveredAnchors, 130);
+  assert.equal(
+    await fs.readFile(path.join(f.workDir, 'sections/1-100/calls.txt'), 'utf8'),
+    'exec\n',
+  );
+  assert.equal(
+    await fs.readFile(path.join(f.workDir, 'sections/101-130/calls.txt'), 'utf8'),
+    'exec\nexec\n',
+  );
+  assert.match(
+    await fs.readFile(path.join(f.workDir, 'sections/101-130/received-prompt.txt'), 'utf8'),
+    /Never use ellipsis-only text/,
+  );
+});
+
 test('CLI invocation keeps subscription auth, disables tools, and strips API environment secrets', () => {
   const args = codexArgs(root, path.join(root, 'out.srt'), 'my-model');
   assert.ok(args.includes('--ignore-user-config'));
@@ -497,6 +546,7 @@ test(
         PUBLIC_ORIGIN: origin,
         BASE_PATH: '',
         APP_PASSWORD: 'test-only-password-123',
+        TRANSLATION_AUTO_RETRIES: '0',
         CODEX_BIN: fake,
       },
     });

@@ -305,3 +305,40 @@ test('API cancellation and HTTP failures are bounded and never retried', async (
     delete process.env.OPENROUTER_API_KEY;
   }
 });
+
+test('API 429 quota exhaustion is permanent while a rate limit is retryable', async (t) => {
+  const { TranslationFailure } = await import('../lib/translation-retry.js');
+  process.env.OPENROUTER_API_KEY = 'fixture-router';
+  const settings = {
+    ...config,
+    TRANSLATION_PROVIDER: 'openrouter-api',
+    CODEX_MODEL: 'vendor/model',
+  };
+  let code = 'insufficient_quota';
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(JSON.stringify({ error: { code, message: 'private provider diagnostics' } }), {
+        status: 429,
+      }),
+  );
+  try {
+    await assert.rejects(
+      responseTranslation('context', settings),
+      (error: unknown) =>
+        error instanceof TranslationFailure &&
+        error.kind === 'quota' &&
+        !error.retryable &&
+        !error.message.includes('private provider'),
+    );
+    code = 'rate_limit_exceeded';
+    await assert.rejects(
+      responseTranslation('context', settings),
+      (error: unknown) =>
+        error instanceof TranslationFailure && error.kind === 'connection' && error.retryable,
+    );
+  } finally {
+    delete process.env.OPENROUTER_API_KEY;
+  }
+});
